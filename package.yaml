@@ -50,7 +50,13 @@ executables:
 
 tests:
   scanner-test:
-    main:		ScannerTest.hs
-    source-dirs:	test
+    main:		test/ScannerTest.hs
+#    source-dirs:	test
+    dependencies:
+    - peng
+
+  parser-test:
+    main:		test/ParserTest.hs
+#    source-dirs:	test
     dependencies:
     - peng

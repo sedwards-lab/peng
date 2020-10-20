@@ -1,3 +1,5 @@
+module Main where
+
 import Scanner ( Token(..), TokenType(..), alexMonadScan, runAlex )
 
 scan :: String -> [Token]

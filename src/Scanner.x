@@ -2,14 +2,13 @@
 
 -- https://stackoverflow.com/questions/20315739/how-to-use-an-alex-monadic-lexer-with-happy
 
-module Scanner ( lexerForHappy, alexMonadScan, runAlex,
-                 Token(..), AlexPosn(..), TokenType(..) ) where
+module Scanner where
 }
 
 %wrapper "monadUserState"
 
 $digit = 0-9
-$blank = $white # \n
+$blank = [ \t]
 
 tokens :-
 
