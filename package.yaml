@@ -1,48 +1,56 @@
 name:                peng
 version:             0.1.0.0
-github:              "githubuser/peng"
+github:              "sedwards-lab/peng"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2020 Author name here"
+author:              "Stephen A. Edwards"
+maintainer:          "sedwards@cs.columbia.edu"
+copyright:           "2020 Stephen A. Edwards"
 
 extra-source-files:
 - README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
+# synopsis:            Real-time programming language
 # category:            Web
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/peng#readme>
+description:         Please see the README on GitHub at <https://github.com/sedwards-lab/peng#README>
 
 dependencies:
 - base >= 4.7 && < 5
 
 library:
   source-dirs: src
+  ghc-options:
+  - -Wall
+  dependencies:
+  - prettyprinter >= 1.6.1
+  - array
 
 executables:
   peng-exe:
     main:                Main.hs
     source-dirs:         app
+
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+    - -Wall
+#    - -threaded
+#    - -rtsopts
+#    - -with-rtsopts=-N
+
     dependencies:
     - peng
 
+    build-tools:
+    - happy
+    - alex
+
 tests:
-  peng-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+  scanner-test:
+    main:		ScannerTest.hs
+    source-dirs:	test
     dependencies:
     - peng
