@@ -25,7 +25,8 @@ tokens :-
 
   <startLine> {
     @newline    ;
-    ()          { firstLineToken } -- First token on the line
+    () / else   { firstLineToken False } -- "else" is a special case
+    ()          { firstLineToken True } -- First token on the line
   }
 
   <freeform> {
@@ -45,6 +46,8 @@ tokens :-
     case  { layoutNL TCase }
     \=    { layout   TEq }
     do    { doBlock }
+
+    \;    { keyword TSemicolon }
 
     \(    { lDelimeter TLparen }
     \)    { rDelimeter TRparen }
@@ -157,7 +160,7 @@ alexPopContext = do
    _ : cs -> alexSetUserState $ st { usContext = cs }
    _      -> alexError "internal error: popped at empty state"
 
-nextLine, beginBlock, firstBlockToken, firstLineToken, endBlock ::
+nextLine, beginBlock, firstBlockToken ::
   AlexInput -> Int -> Alex Token
 
 -- At the start of the line: check the current context, switching from
@@ -181,26 +184,26 @@ firstBlockToken alexInput l = do alexPopContext -- should be in StartBlock
 
 
 -- At the first token in a line in a block, check the offside rule
-firstLineToken (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
-                                 alexMonadScan
-firstLineToken alexInput l = do
+firstLineToken :: Bool -> AlexInput -> Int -> Alex Token
+firstLineToken _ (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
+                                   alexMonadScan
+firstLineToken shouldSeparate alexInput _ = do
   ctxt <- alexPeekContext
   let tCol = inputCol alexInput
   case ctxt of
     InBlock col | tCol > col  -> do alexSetStartCode inBlock -- Continued line
                                     alexMonadScan
                 | tCol == col -> do alexSetStartCode inBlock -- Next line starts
-                                    return $
+                                    if shouldSeparate then return $
                                        Token (inputPos alexInput) TSemicolon
-                | otherwise   -> endBlock alexInput l        -- Block has ended
+                                    else alexMonadScan
+                | otherwise   -> do alexPopContext -- but stay in startLine code
+                                    return $ Token (inputPos alexInput) TRbrace
                 -- FIXME: what about error conditions?
     _ -> alexError "StartBlock or StartBlockNL at first line token?"
 
-endBlock alexInput _ = do alexPopContext
-                          return $ Token (inputPos alexInput) TRbrace
-
 data Token = Token AlexPosn TokenType
-  deriving Show
+  deriving (Show, Eq)
 
 data TokenType =
     TEOF
@@ -220,7 +223,7 @@ data TokenType =
   | TInteger Integer
   | TString String
   | TId String
-  deriving Show
+  deriving (Show, Eq)
 
 lexerForHappy :: (Token -> Alex a) -> Alex a
 lexerForHappy = (alexMonadScan >>=)
