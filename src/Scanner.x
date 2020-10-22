@@ -26,11 +26,17 @@ tokens :-
   <startLine> {
     @newline    ;
     ()          { firstLineToken } -- First token on the line
-  } 
+  }
 
-  <0,normal> {
+  <freeform> {
+    @newline    ;
+  }
 
+  <0,inBlock> {
     @newline { nextLine }
+  }
+
+  <0,freeform,inBlock> {
     
     if    { layoutNL TIf }
     else  { layout   TElse }
@@ -38,9 +44,14 @@ tokens :-
     let   { layout   TLet }
     case  { layoutNL TCase }
     \=    { layout   TEq }
+    do    { doBlock }
 
-    \(    { \ _ _ -> do alexPushContext StartBlock ; alexMonadScan }
-    \)    { endBlock }
+    \(    { lDelimeter TLparen }
+    \)    { rDelimeter TRparen }
+    \[    { lDelimeter TLbracket }
+    \]    { rDelimeter TRbracket }
+    \{    { lDelimeter TLbrace }
+    \}    { rDelimeter TRbrace }
   
     $digit+ { \ (pos,_,_,s) len ->
                   return $ Token pos $ TInteger $ read $ take len s }
@@ -73,10 +84,34 @@ layoutNL ttype alexInput _ = do
    alexPushContext StartBlockNL
    return $ Token (inputPos alexInput) ttype
 
+lDelimeter :: TokenType -> AlexInput -> Int -> Alex Token
+lDelimeter ttype alexInput _ = do
+  case ttype of
+    TLbrace -> do
+      ctxt <- alexPeekContext
+      case ctxt of
+        StartBlock   -> alexPopContext -- About to start a block? Found it
+        StartBlockNL -> alexPopContext -- About to start a block? Found it
+        _            -> return ()
+    _ -> return ()
+  alexPushContext Freeform
+  return $ Token (inputPos alexInput) ttype
+
+rDelimeter :: TokenType -> AlexInput -> Int -> Alex Token
+rDelimeter ttype alexInput _ = do alexPopContext
+                                  alexPeekContext >>= alexSwitchContext
+                                  return $ Token (inputPos alexInput) ttype
+
+-- Immediately start a block
+doBlock :: AlexInput -> Int -> Alex Token
+doBlock _ _ = do alexPushContext StartBlock
+                 alexMonadScan
+
 
 data ScannerContext = InBlock Int  -- In a block with the given left margin
                     | StartBlock   -- Start a block at the next token
                     | StartBlockNL -- Start a block on the next line
+                    | Freeform     -- Outside a block; ignore indentation
 
 data AlexUserState = AlexUserState { usContext :: [ScannerContext]
                                    }
@@ -105,7 +140,9 @@ alexPushContext ctxt = do
 -- Set the start code appropriately for the given context
 alexSwitchContext :: ScannerContext -> Alex ()
 alexSwitchContext StartBlock = alexSetStartCode startBlock
-alexSwitchContext _ = alexSetStartCode normal
+alexSwitchContext (InBlock _) = alexSetStartCode inBlock
+alexSwitchContext StartBlockNL = alexSetStartCode inBlock
+alexSwitchContext Freeform = alexSetStartCode freeform
 
 alexPeekContext :: Alex ScannerContext
 alexPeekContext = do st <- alexGetUserState
@@ -131,10 +168,11 @@ nextLine _ _ = do ctxt <- alexPeekContext
                     StartBlock -> return ()
                     StartBlockNL -> do alexPopContext
                                        alexPushContext StartBlock
+                    Freeform -> alexError "internal error: nextLine in Freeform?"
                   alexMonadScan
 
 beginBlock alexInput _ = do alexPushContext (InBlock $ inputCol alexInput)
-                            return $ Token (inputPos alexInput) TBegin
+                            return $ Token (inputPos alexInput) TLbrace
 
 -- At the first token in a block, remove the current state,
 -- enter a new block context based on this token, and return a TBegin token
@@ -143,22 +181,23 @@ firstBlockToken alexInput l = do alexPopContext -- should be in StartBlock
 
 
 -- At the first token in a line in a block, check the offside rule
-firstLineToken (_,_,_,"") _ = do alexSetStartCode normal -- EOF case
+firstLineToken (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
                                  alexMonadScan
 firstLineToken alexInput l = do
   ctxt <- alexPeekContext
   let tCol = inputCol alexInput
   case ctxt of
-    InBlock col | tCol > col  -> do alexSetStartCode normal  -- Continued line
+    InBlock col | tCol > col  -> do alexSetStartCode inBlock -- Continued line
                                     alexMonadScan
-                | tCol == col -> do alexSetStartCode normal  -- Next line starts
-                                    return $ Token (inputPos alexInput) TSep
+                | tCol == col -> do alexSetStartCode inBlock -- Next line starts
+                                    return $
+                                       Token (inputPos alexInput) TSemicolon
                 | otherwise   -> endBlock alexInput l        -- Block has ended
                 -- FIXME: what about error conditions?
     _ -> alexError "StartBlock or StartBlockNL at first line token?"
 
 endBlock alexInput _ = do alexPopContext
-                          return $ Token (inputPos alexInput) TEnd
+                          return $ Token (inputPos alexInput) TRbrace
 
 data Token = Token AlexPosn TokenType
   deriving Show
@@ -171,9 +210,13 @@ data TokenType =
   | TLet
   | TCase
   | TEq
-  | TBegin           -- Block begin, implicit
-  | TEnd             -- Block end, implicit
-  | TSep             -- Block element separator, implicit
+  | TLparen
+  | TRparen
+  | TLbrace
+  | TRbrace
+  | TLbracket
+  | TRbracket
+  | TSemicolon
   | TInteger Integer
   | TString String
   | TId String
@@ -186,25 +229,10 @@ lexerForHappy = (alexMonadScan >>=)
 alexEOF :: Alex Token
 alexEOF = Alex $ \s@AlexState{ alex_pos = pos, alex_ust = st } ->
           case dropWhile isntBlock (usContext st) of
-            InBlock _: ctxts@(_:_) -> Right (s', Token pos TEnd)
+            InBlock _: ctxts@(_:_) -> Right (s', Token pos TRbrace)
                 where s' = s { alex_ust = st { usContext = ctxts } }
             _ -> Right (s, Token pos TEOF)
             where isntBlock (InBlock _) = False
                   isntBlock _ = True                  
-
-{-
-atBeginningOfLine :: AlexInput -> Int -> Alex Token
-atBeginningOfLine alexInput _ = do
-  context <- alexGetContext
-  case context of
-    [] -> do alexSetStartCode 0  -- Should never happen?
-             alexMonadScan
-    -- FIXME: other cases
-
-    -- FIXME: drop a context and go to the state that's exposed at the top
-    
-    -- Idea is that top of user stack always reflects the proper start code
-    -- explicit push and pop operations that sets the code appropriately?
--}
 
 }

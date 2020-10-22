@@ -69,6 +69,12 @@ main = do putStrLn "Scanner test"
                                 ,"// More empties"
                                 ,""
                                 ," line3"]
+          printTokens $ unlines ["let a = (42"
+                                ," 12 46 823"
+                                ,")"
+                                ,"    b = 51"
+                                ,"        run"
+                                ,"          jump"]
             
 
 
