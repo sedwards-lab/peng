@@ -25,8 +25,7 @@ tokens :-
 
   <startLine> {
     @newline    ;
-    () / else   { firstLineToken False } -- "else" is a special case
-    ()          { firstLineToken True } -- First token on the line
+    ()          { firstLineToken } -- First token on the line
   }
 
   <freeform> {
@@ -184,19 +183,18 @@ firstBlockToken alexInput l = do alexPopContext -- should be in StartBlock
 
 
 -- At the first token in a line in a block, check the offside rule
-firstLineToken :: Bool -> AlexInput -> Int -> Alex Token
-firstLineToken _ (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
-                                   alexMonadScan
-firstLineToken shouldSeparate alexInput _ = do
+firstLineToken :: AlexInput -> Int -> Alex Token
+firstLineToken (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
+                                 alexMonadScan
+firstLineToken alexInput _ = do
   ctxt <- alexPeekContext
   let tCol = inputCol alexInput
   case ctxt of
     InBlock col | tCol > col  -> do alexSetStartCode inBlock -- Continued line
                                     alexMonadScan
                 | tCol == col -> do alexSetStartCode inBlock -- Next line starts
-                                    if shouldSeparate then return $
-                                       Token (inputPos alexInput) TSemicolon
-                                    else alexMonadScan
+                                    return $
+                                      Token (inputPos alexInput) TSemicolon
                 | otherwise   -> do alexPopContext -- but stay in startLine code
                                     return $ Token (inputPos alexInput) TRbrace
                 -- FIXME: what about error conditions?
@@ -208,10 +206,13 @@ data Token = Token AlexPosn TokenType
 data TokenType =
     TEOF
   | TIf
+  | TThen
   | TElse
   | TWhile
+  | TDo
   | TLet
   | TCase
+  | TOf
   | TEq
   | TPlus
   | TSemicolon
@@ -240,8 +241,6 @@ alexEOF = Alex $ \s@AlexState{ alex_pos = pos, alex_ust = st } ->
             where isntBlock (InBlock _) = False
                   isntBlock _ = True                  
 
-}
-
 
 {-
 
@@ -257,3 +256,6 @@ Need to insert a "do" token before the body of a 'while' block
 Use "|" for the separator for case?
 
 -}
+
+
+}

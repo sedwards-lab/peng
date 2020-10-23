@@ -206,6 +206,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 38 4 3) TSemicolon
                       ,Token (AlexPn 38 4 3) (TId "newline")
                       ,Token (AlexPn 46 5 1) TRbrace
+                      ,Token (AlexPn 46 5 1) TSemicolon
                       ,Token (AlexPn 46 5 1) TElse
                       ,Token (AlexPn 53 6 3) TLbrace
                       ,Token (AlexPn 53 6 3) (TId "forgetit")
@@ -347,6 +348,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 20 1 21) TSemicolon
                       ,Token (AlexPn 22 1 23) (TId "block")
                       ,Token (AlexPn 28 1 29) TRbrace
+                      ,Token (AlexPn 30 2 1) TSemicolon
                       ,Token (AlexPn 30 2 1) TElse
                       ,Token (AlexPn 35 2 6) TLbrace
                       ,Token (AlexPn 35 2 6) (TId "real")
