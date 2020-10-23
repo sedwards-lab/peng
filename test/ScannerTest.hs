@@ -54,7 +54,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 8 1 9) TLbrace
                       ,Token (AlexPn 8 1 9) (TInteger 42)
                       ,Token (AlexPn 35 2 5) TRbrace
-                      ,Token (AlexPn 35 2 5) TSemicolon
+                      ,Token (AlexPn 35 2 5) TAnd
                       ,Token (AlexPn 35 2 5) (TId "b")
                       ,Token (AlexPn 37 2 7) TEq
                       ,Token (AlexPn 39 2 9) TLbrace
@@ -75,6 +75,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 172 7 7) (TInteger 1)
                       ,Token (AlexPn 174 7 9) (TInteger 2)
                       ,Token (AlexPn 176 7 11) (TInteger 3)
+                      ,Token (AlexPn 177 7 12) TDo
                       ,Token (AlexPn 179 8 2) TLbrace
                       ,Token (AlexPn 179 8 2) (TId "block")
                       ,Token (AlexPn 185 8 8) (TInteger 3)
@@ -199,6 +200,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 3 1 4) (TId "a")
                       ,Token (AlexPn 5 1 6) (TId "equals")
                       ,Token (AlexPn 12 1 13) (TId "b")
+                      ,Token (AlexPn 13 1 14) TThen
                       ,Token (AlexPn 16 2 3) TLbrace
                       ,Token (AlexPn 16 2 3) (TInteger 42)
                       ,Token (AlexPn 19 2 6) (TInteger 57)
@@ -226,6 +228,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 17 2 9) (TInteger 44)
                       ,Token (AlexPn 24 3 5) (TId "cont")
                       ,Token (AlexPn 36 4 8) TRparen
+                      ,Token (AlexPn 37 4 9) TThen
                       ,Token (AlexPn 40 5 3) TLbrace
                       ,Token (AlexPn 40 5 3) (TId "body1")
                       ,Token (AlexPn 46 5 9) (TId "body2")
@@ -248,6 +251,7 @@ main = do putStrLn "Scanner test"
           checkTokens [Token (AlexPn 0 1 1) TIf
                       ,Token (AlexPn 3 1 4) TLparen
                       ,Token (AlexPn 4 1 5) TRparen
+                      ,Token (AlexPn 5 1 6) TThen
                       ,Token (AlexPn 6 2 1) TLbrace
                       ,Token (AlexPn 6 2 1) TRbrace]
             $ unlines ["if ()"]
@@ -255,6 +259,7 @@ main = do putStrLn "Scanner test"
           checkTokens [Token (AlexPn 0 1 1) TIf
                       ,Token (AlexPn 3 1 4) TLparen
                       ,Token (AlexPn 4 1 5) TRparen
+                      ,Token (AlexPn 5 1 6) TThen
                       ,Token (AlexPn 7 2 2) TLbrace
                       ,Token (AlexPn 7 2 2) (TId "line1")
                       ,Token (AlexPn 13 3 1) TRbrace]
@@ -264,6 +269,7 @@ main = do putStrLn "Scanner test"
           checkTokens [Token (AlexPn 0 1 1) TIf
                       ,Token (AlexPn 3 1 4) TLparen
                       ,Token (AlexPn 4 1 5) TRparen
+                      ,Token (AlexPn 5 1 6) TThen
                       ,Token (AlexPn 8 3 2) TLbrace
                       ,Token (AlexPn 8 3 2) (TId "line1")
                       ,Token (AlexPn 42 7 3) (TId "line1cont")
@@ -297,7 +303,7 @@ main = do putStrLn "Scanner test"
                       ,Token (AlexPn 19 2 8) (TInteger 823)
                       ,Token (AlexPn 23 3 1) TRparen
                       ,Token (AlexPn 29 4 5) TRbrace
-                      ,Token (AlexPn 29 4 5) TSemicolon
+                      ,Token (AlexPn 29 4 5) TAnd
                       ,Token (AlexPn 29 4 5) (TId "b")
                       ,Token (AlexPn 31 4 7) TEq
                       ,Token (AlexPn 33 4 9) TLbrace

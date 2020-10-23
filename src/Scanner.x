@@ -38,12 +38,12 @@ tokens :-
 
   <0,freeform,inBlock> {
     
-    if    { layoutNL TIf }
-    else  { layout   TElse }
-    while { layoutNL TWhile }
-    let   { layout   TLet }
-    case  { layoutNL TCase }
-    \=    { layout   TEq }
+    if    { layoutNL TIf TThen TSemicolon}
+    else  { layout   TElse TSemicolon }
+    while { layoutNL TWhile TDo TSemicolon}
+    let   { layout   TLet TAnd}
+    case  { layoutNL TCase TOf TBar }
+    \=    { layout   TEq TSemicolon }
     do    { doBlock }
 
     \;    { keyword TSemicolon }
@@ -76,14 +76,15 @@ keyword :: TokenType -> AlexInput -> Int -> Alex Token
 keyword ttype alexInput _ = return $ Token (inputPos alexInput) ttype
 
 -- Layout keyword: 
-layout :: TokenType -> AlexInput -> Int -> Alex Token
-layout ttype alexInput _ = do alexPushContext StartBlock
-                              return $ Token (inputPos alexInput) ttype
+layout :: TokenType -> TokenType -> AlexInput -> Int -> Alex Token
+layout ttype sepToken alexInput _ = do alexPushContext $ StartBlock sepToken
+                                       return $ Token (inputPos alexInput) ttype
 
 -- Layout-next-line keyword: set to StartBlockNL state
-layoutNL :: TokenType -> AlexInput -> Int -> Alex Token
-layoutNL ttype alexInput _ = do
-   alexPushContext StartBlockNL
+layoutNL :: TokenType -> TokenType -> TokenType -> AlexInput -> Int
+         -> Alex Token
+layoutNL ttype startToken sepToken alexInput _ = do
+   alexPushContext $ StartBlockNL startToken sepToken
    return $ Token (inputPos alexInput) ttype
 
 lDelimeter :: TokenType -> AlexInput -> Int -> Alex Token
@@ -92,9 +93,9 @@ lDelimeter ttype alexInput _ = do
     TLbrace -> do
       ctxt <- alexPeekContext
       case ctxt of
-        StartBlock   -> alexPopContext -- About to start a block? Found it
-        StartBlockNL -> alexPopContext -- About to start a block? Found it
-        _            -> return ()
+        StartBlock _     -> alexPopContext -- About to start a block? Found it
+        StartBlockNL _ _ -> alexPopContext -- About to start a block? Found it
+        _                -> return ()
     _ -> return ()
   alexPushContext Freeform
   return $ Token (inputPos alexInput) ttype
@@ -106,20 +107,23 @@ rDelimeter ttype alexInput _ = do alexPopContext
 
 -- Immediately start a block
 doBlock :: AlexInput -> Int -> Alex Token
-doBlock _ _ = do alexPushContext StartBlock
+doBlock _ _ = do alexPushContext $ StartBlock TSemicolon
                  alexMonadScan
 
 
-data ScannerContext = InBlock Int  -- In a block with the given left margin
-                    | StartBlock   -- Start a block at the next token
-                    | StartBlockNL -- Start a block on the next line
-                    | Freeform     -- Outside a block; ignore indentation
+data ScannerContext =
+    InBlock Int TokenType -- In a block with the given left margin and separator
+  | StartBlock TokenType  -- Start a block at the next token
+                          -- with the given separator
+  | StartBlockNL TokenType TokenType  -- Start a block on the next line with the
+                                      -- given start token and separator
+  | Freeform     -- Outside a block; ignore indentation
 
 data AlexUserState = AlexUserState { usContext :: [ScannerContext]
                                    }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState { usContext = [InBlock 1]
+alexInitUserState = AlexUserState { usContext = [InBlock 1 TSemicolon]
                                   }
 
 {-
@@ -141,9 +145,9 @@ alexPushContext ctxt = do
 
 -- Set the start code appropriately for the given context
 alexSwitchContext :: ScannerContext -> Alex ()
-alexSwitchContext StartBlock = alexSetStartCode startBlock
-alexSwitchContext (InBlock _) = alexSetStartCode inBlock
-alexSwitchContext StartBlockNL = alexSetStartCode inBlock
+alexSwitchContext (StartBlock _) = alexSetStartCode startBlock
+alexSwitchContext (InBlock _ _) = alexSetStartCode inBlock
+alexSwitchContext (StartBlockNL _ _) = alexSetStartCode inBlock
 alexSwitchContext Freeform = alexSetStartCode freeform
 
 alexPeekContext :: Alex ScannerContext
@@ -159,45 +163,46 @@ alexPopContext = do
    _ : cs -> alexSetUserState $ st { usContext = cs }
    _      -> alexError "internal error: popped at empty state"
 
-nextLine, beginBlock, firstBlockToken ::
-  AlexInput -> Int -> Alex Token
+nextLine, firstBlockToken, firstLineToken :: AlexInput -> Int -> Alex Token
 
 -- At the start of the line: check the current context, switching from
 -- StartBlockNL to StartBlock if necessary, and continue scanning
-nextLine _ _ = do ctxt <- alexPeekContext
-                  case ctxt of
-                    InBlock _ -> alexSetStartCode startLine
-                    StartBlock -> return ()
-                    StartBlockNL -> do alexPopContext
-                                       alexPushContext StartBlock
-                    Freeform -> alexError "internal error: nextLine in Freeform?"
-                  alexMonadScan
-
-beginBlock alexInput _ = do alexPushContext (InBlock $ inputCol alexInput)
-                            return $ Token (inputPos alexInput) TLbrace
+nextLine alexInput _ = do
+  ctxt <- alexPeekContext
+  case ctxt of
+    InBlock _ _ -> do alexSetStartCode startLine
+                      alexMonadScan
+    StartBlock _ -> alexMonadScan
+    StartBlockNL startToken sepToken -> do
+            alexPopContext
+            alexPushContext $ StartBlock sepToken
+            return $ Token (inputPos alexInput) startToken
+    Freeform -> alexError "internal error: nextLine in Freeform?"
 
 -- At the first token in a block, remove the current state,
 -- enter a new block context based on this token, and return a TBegin token
-firstBlockToken alexInput l = do alexPopContext -- should be in StartBlock
-                                 beginBlock alexInput l
-
+firstBlockToken alexInput _ = do
+   ctxt <- alexPeekContext
+   let sepToken = case ctxt of StartBlock s -> s
+                               _ -> TSemicolon -- should not happen
+   alexPopContext -- should be in StartBlock
+   alexPushContext $ InBlock (inputCol alexInput) sepToken
+   return $ Token (inputPos alexInput) TLbrace
 
 -- At the first token in a line in a block, check the offside rule
-firstLineToken :: AlexInput -> Int -> Alex Token
 firstLineToken (_,_,_,"") _ = do alexSetStartCode inBlock -- EOF case
                                  alexMonadScan
 firstLineToken alexInput _ = do
   ctxt <- alexPeekContext
   let tCol = inputCol alexInput
   case ctxt of
-    InBlock col | tCol > col  -> do alexSetStartCode inBlock -- Continued line
-                                    alexMonadScan
-                | tCol == col -> do alexSetStartCode inBlock -- Next line starts
-                                    return $
-                                      Token (inputPos alexInput) TSemicolon
-                | otherwise   -> do alexPopContext -- but stay in startLine code
-                                    return $ Token (inputPos alexInput) TRbrace
-                -- FIXME: what about error conditions?
+    InBlock col sepToken
+      | tCol > col  -> do alexSetStartCode inBlock -- Continued line
+                          alexMonadScan
+      | tCol == col -> do alexSetStartCode inBlock -- Next line starts
+                          return $ Token (inputPos alexInput) sepToken
+      | otherwise   -> do alexPopContext -- but stay in startLine code
+                          return $ Token (inputPos alexInput) TRbrace
     _ -> alexError "StartBlock or StartBlockNL at first line token?"
 
 data Token = Token AlexPosn TokenType
@@ -211,11 +216,13 @@ data TokenType =
   | TWhile
   | TDo
   | TLet
+  | TAnd
   | TCase
   | TOf
   | TEq
   | TPlus
   | TSemicolon
+  | TBar
   | TColon
   | TLparen
   | TRparen
@@ -235,10 +242,10 @@ lexerForHappy = (alexMonadScan >>=)
 alexEOF :: Alex Token
 alexEOF = Alex $ \s@AlexState{ alex_pos = pos, alex_ust = st } ->
           case dropWhile isntBlock (usContext st) of
-            InBlock _: ctxts@(_:_) -> Right (s', Token pos TRbrace)
+            InBlock _ _ : ctxts@(_:_) -> Right (s', Token pos TRbrace)
                 where s' = s { alex_ust = st { usContext = ctxts } }
             _ -> Right (s, Token pos TEOF)
-            where isntBlock (InBlock _) = False
+            where isntBlock (InBlock _ _) = False
                   isntBlock _ = True                  
 
 
