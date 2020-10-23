@@ -213,13 +213,15 @@ data TokenType =
   | TLet
   | TCase
   | TEq
+  | TPlus
+  | TSemicolon
+  | TColon
   | TLparen
   | TRparen
   | TLbrace
   | TRbrace
   | TLbracket
   | TRbracket
-  | TSemicolon
   | TInteger Integer
   | TString String
   | TId String
@@ -239,3 +241,19 @@ alexEOF = Alex $ \s@AlexState{ alex_pos = pos, alex_ust = st } ->
                   isntBlock _ = True                  
 
 }
+
+
+{-
+
+Ideas: looks like we can get rid of the "else exception" -- it will
+disambiguate fine with the ';' provided we put in a precedence for ';'
+
+Should we use a different separator for let blocks?
+
+Need to insert a "then" token before the body of the 'if' block.
+Need to insert a "do" token before the body of a 'while' block
+"of" before the body of a "case"
+
+Use "|" for the separator for case?
+
+-}

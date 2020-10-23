@@ -357,3 +357,57 @@ main = do putStrLn "Scanner test"
             $ unlines ["if 42 21 { explicit ; block }"
                       ,"else real"
                       ,"     block 42"]
+
+
+{-
+if do one
+      two
+      three
+  body1
+  body2
+
+
+-- Completely ignoring indentation in delimited regions
+-- Reasonable
+
+              (sdf asf sdf
+1 2 3 4)
+
+         (sdf asd sdf
+        1 2 3 4)
+
+-- No indentation errors
+
+let a = 3
+     b = 4
+  c = 5
+
+let {a = {3}
+     b = {4}}
+  c = 5
+
+let { a = { 3 } b = { 4 } } c = 5
+
+{ asdfa } { 42 }
+
+asdfa 42
+
+
+f(x,y,z)
+
+f x y z
+
+
+
+A problem with "if"
+
+if (asdfads) {asd ; asd}
+
+looks like "apply asdfds to {asd; asd}"
+
+Really need something like "then"
+
+
+
+
+-}

@@ -3,7 +3,7 @@ module Main where
 import Scanner
 import Parser
 
-parseStr :: String -> Either String [Lit]
+parseStr :: String -> Either String [[Int]]
 parseStr s = runAlex s parse
 
 main :: IO ()
