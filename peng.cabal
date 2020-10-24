@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ea08a386600ed9951e93ee3a1db69a77bfd23b48f8a4a187b5076a15f894a13a
+-- hash: 9ddada364ff0b70522e9f7f4c637c2f7af5a9ea682d946164afd6887230918f0
 
 name:           peng
 version:        0.1.0.0
@@ -28,6 +28,11 @@ source-repository head
 library
   exposed-modules:
       Ast
+      Ast2IR
+      C
+      CGen
+      Duration
+      IR
       Parser
       Scanner
   other-modules:
@@ -38,6 +43,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , mtl
     , prettyprinter >=1.7.0
   default-language: Haskell2010
 

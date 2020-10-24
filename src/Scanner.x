@@ -3,6 +3,10 @@
 -- https://stackoverflow.com/questions/20315739/how-to-use-an-alex-monadic-lexer-with-happy
 
 module Scanner where
+
+import Data.Char ( isDigit )
+import Duration
+import Data.Word ( Word64 )
 }
 
 %wrapper "monadUserState"
@@ -58,6 +62,13 @@ tokens :-
     \]    { rDelimeter TRbracket }
     \{    { lDelimeter TLbrace }
     \}    { rDelimeter TRbrace }
+
+    $digit+ $blank* ns { duration            1 }
+    $digit+ $blank* us { duration         1000 }
+    $digit+ $blank* ms { duration      1000000 }
+    $digit+ $blank* s  { duration   1000000000 }
+    $digit+ $blank* m  { duration  60000000000 }
+    $digit+ $blank* h  { duration 300000000000 }
   
     $digit+ { \ (pos,_,_,s) len ->
                   return $ Token pos $ TInteger $ read $ take len s }
@@ -79,7 +90,7 @@ inputCol ((AlexPn _ _ col), _, _, _) = col
 keyword :: TokenType -> AlexInput -> Int -> Alex Token
 keyword ttype alexInput _ = return $ Token (inputPos alexInput) ttype
 
--- Layout keyword: 
+-- Layout keyword
 layout :: TokenType -> TokenType -> AlexInput -> Int -> Alex Token
 layout ttype sepToken alexInput _ = do alexPushContext $ StartBlock sepToken
                                        return $ Token (inputPos alexInput) ttype
@@ -91,6 +102,7 @@ layoutNL ttype startToken sepToken alexInput _ = do
    alexPushContext $ StartBlockNL startToken sepToken
    return $ Token (inputPos alexInput) ttype
 
+-- Left delimiter, e.g., (, {, [
 lDelimeter :: TokenType -> AlexInput -> Int -> Alex Token
 lDelimeter ttype alexInput _ = do
   case ttype of
@@ -104,6 +116,7 @@ lDelimeter ttype alexInput _ = do
   alexPushContext Freeform
   return $ Token (inputPos alexInput) ttype
 
+-- Right delimiter, e.g., ), }, ]
 rDelimeter :: TokenType -> AlexInput -> Int -> Alex Token
 rDelimeter ttype alexInput _ = do alexPopContext
                                   alexPeekContext >>= alexSwitchContext
@@ -113,6 +126,11 @@ rDelimeter ttype alexInput _ = do alexPopContext
 doBlock :: AlexInput -> Int -> Alex Token
 doBlock _ _ = do alexPushContext $ StartBlock TSemicolon
                  alexMonadScan
+
+-- Duration literals
+duration :: Word64 -> AlexInput -> Int -> Alex Token
+duration mult (pos,_,_,s) _ = return $ Token pos $ TDuration dur
+  where dur = Duration $ mult * (read $ takeWhile isDigit s)
 
 
 data ScannerContext =
@@ -210,7 +228,7 @@ firstLineToken alexInput _ = do
     _ -> alexError "StartBlock or StartBlockNL at first line token?"
 
 data Token = Token AlexPosn TokenType
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
 data TokenType =
     TEOF
@@ -239,7 +257,8 @@ data TokenType =
   | TInteger Integer
   | TString String
   | TId String
-  deriving (Show, Eq)
+  | TDuration Duration
+  deriving (Eq, Show)
 
 lexerForHappy :: (Token -> Alex a) -> Alex a
 lexerForHappy = (alexMonadScan >>=)

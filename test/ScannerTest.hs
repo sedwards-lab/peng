@@ -1,7 +1,7 @@
 module Main where
 
 import Scanner ( Token(..), TokenType(..), alexMonadScan, runAlex,
-                 AlexPosn(..) )
+                 AlexPosn(..), Duration(..) )
 
 import Data.List ( intercalate )
 
@@ -365,6 +365,16 @@ main = do putStrLn "Scanner test"
             $ unlines ["if 42 21 { explicit ; block }"
                       ,"else real"
                       ,"     block 42"]
+
+          checkTokens [Token (AlexPn 0 1 1)   (TInteger 42)
+                      ,Token (AlexPn 3 1 4)   (TDuration (Duration            42))
+                      ,Token (AlexPn 9 1 10)  (TDuration (Duration         41000))
+                      ,Token (AlexPn 15 1 16) (TDuration (Duration      40000000))
+                      ,Token (AlexPn 21 1 22) (TDuration (Duration    2000000000))
+                      ,Token (AlexPn 25 1 26) (TDuration (Duration  180000000000))
+                      ,Token (AlexPn 29 1 30) (TDuration (Duration 1200000000000))
+                      ]
+             "42 42 ns 41 us 40 ms 2 s 3m  4     h"
 
 
 {-

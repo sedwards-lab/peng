@@ -29,6 +29,7 @@ library:
   dependencies:
   - prettyprinter >= 1.7.0
   - array
+  - mtl
 
 executables:
   peng-exe:

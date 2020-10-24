@@ -2,6 +2,7 @@ module Ast where
 
 import Prettyprinter
 import Prelude hiding ( (<>), id )
+import Duration
 
 data Program = Program [Declaration]
 
@@ -15,6 +16,7 @@ data Ty = TCon String
 data Expr = Id String
           | IntLit Integer
           | StringLit String
+          | DurLit Duration
           | Apply Expr Expr
           | BinOp Expr String Expr
           | NoExpr
@@ -29,6 +31,9 @@ data Def = Def String Expr
 
 instance Show Program where
   show (Program decls) = concatMap (\d -> show (pretty d) ++ "\n\n") decls
+
+instance Show Expr where
+  show e = show $ pretty e
 
 instance Pretty Declaration where
   pretty (Function id formals body) =
@@ -48,6 +53,7 @@ instance Pretty Expr where
   pretty (Id id) = pretty id
   pretty (IntLit i) = pretty i
   pretty (StringLit s) = pretty '"' <> pretty s <> pretty '"'
+  pretty (DurLit d) = pretty $ show d
   pretty (Apply (Id id) e) = pretty id <+> pretty e
   pretty (Apply e1 e2) = parens (pretty e1) <+> pretty e2
   pretty (BinOp e1 op e2) =
