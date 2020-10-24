@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1b1d58456cf5109c60880f05f920d8c089c66a23de3b065a073c93d3c8c4ca89
+-- hash: ea08a386600ed9951e93ee3a1db69a77bfd23b48f8a4a187b5076a15f894a13a
 
 name:           peng
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Ast
       Parser
       Scanner
   other-modules:
@@ -37,7 +38,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
-    , prettyprinter >=1.6.1
+    , prettyprinter >=1.7.0
   default-language: Haskell2010
 
 executable peng-exe

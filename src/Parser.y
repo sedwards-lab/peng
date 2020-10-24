@@ -10,6 +10,7 @@ Then check Parser.info
 module Parser where
   
 import Scanner
+import Ast
 
 }
 
@@ -25,13 +26,17 @@ import Scanner
   'else'  { Token _ TElse }
   'while' { Token _ TWhile }
   'do'    { Token _ TDo }
+  'loop'  { Token _ TLoop }
   'let'   { Token _ TLet }
+  'and'   { Token _ TAnd }  
   'case'  { Token _ TCase }
   'of'    { Token _ TOf }
   '='     { Token _ TEq }
+  ':'     { Token _ TColon }
   '+'     { Token _ TPlus }
   ';'     { Token _ TSemicolon }
-  ':'     { Token _ TColon }
+  '|'     { Token _ TBar }
+  ','     { Token _ TComma }
   '('     { Token _ TLparen }
   ')'     { Token _ TRparen }
   '{'     { Token _ TLbrace }
@@ -51,38 +56,60 @@ import Scanner
 
 %%
 
-program : topdecl              { [$1] }
-        | program ';' topdecl  { $3 : $1 }
+program : topdecls { Program (reverse $1) }
 
-topdecl : 'let' '{' id '=' expr '}' { [] }
+topdecls : topdecl               { [$1] }
+         | topdecls ';' topdecl  { $3 : $1 }
 
-expr : expr ';' expr0 { [] }
+topdecl : id '(' optFormals ')' '=' '{' expr '}' { Function $1 $3 $7 }
+
+optFormals : {- nothing -} { [] }
+           | formals       { reverse $1 }
+
+formals : formal             { [$1] }
+        | formals ',' formal { $3 : $1 }
+
+formal : ids ':' typs   { Bind (reverse $1) $3 }
+
+ids : id          { [$1] }
+    | ids ',' id  { $3 : $1 }
+
+typs : typ      { $1 }
+     | typs typ { TApp $1 $2 }
+    
+typ: id           { TCon $1 }
+   | '(' typs ')' { $2 }
+   
+
+
+expr : expr ';' expr0 { Seq $1 $3 }
      | expr0          { $1 }
 
-expr0 : 'if' expr 'then' expr0 elseOpt { [] }
-      | 'while' expr 'do' expr0 { [] }
-      | 'let' '{' binds '}'     { [] }
-      | expr1  { $1 }
+expr0 : 'if' expr 'then' expr0 elseOpt { IfElse $2 $4 $5 }
+      | 'while' expr 'do' expr0        { While $2 $4 }
+      | 'let' '{' binds '}'            { Let (reverse $3) }
+      | 'loop' expr0                   { Loop $2 }
+      | expr1                          { $1 }
       
-elseOpt : {- nothing -} %prec NOELSE { [] }
-        | ';' 'else' expr0           { [] }
+elseOpt : {- nothing -} %prec NOELSE { NoExpr }
+        | ';' 'else' expr0           { $3 }
 
-expr1 : expr1 '+' expr1 { [] }
+expr1 : expr1 '+' expr1 { BinOp $1 "+" $3 }
       | apply           { $1 }            
 
-apply : apply aexpr { [] }
+apply : apply aexpr { Apply $1 $2 }
       | aexpr       { $1 }
 
-aexpr : int             { [] }
-      | string          { [] }
-      | id              { [] }
+aexpr : int             { IntLit $1 }
+      | string          { StringLit $1 }
+      | id              { Id $1 }
       | '(' expr ')'    { $2 }
       | '{' expr '}'    { $2 }
 
-binds : binds ';' bind  { $3 : $1 }
-      | bind            { [$1] }
+binds : binds 'and' bind  { $3 : $1 }
+      | bind              { [$1] }
 
-bind : id '=' aexpr     { [] }
+bind : id '=' aexpr       { Def $1 $3 }
 
        
 {

@@ -27,7 +27,7 @@ library:
   ghc-options:
   - -Wall
   dependencies:
-  - prettyprinter >= 1.6.1
+  - prettyprinter >= 1.7.0
   - array
 
 executables:

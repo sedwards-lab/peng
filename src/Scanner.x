@@ -43,10 +43,14 @@ tokens :-
     while { layoutNL TWhile TDo TSemicolon}
     let   { layout   TLet TAnd}
     case  { layoutNL TCase TOf TBar }
+    loop  { layout   TLoop TSemicolon }
     \=    { layout   TEq TSemicolon }
+    \:    { keyword TColon }
     do    { doBlock }
 
     \;    { keyword TSemicolon }
+    \|    { keyword TBar }
+    \,    { keyword TComma }
 
     \(    { lDelimeter TLparen }
     \)    { rDelimeter TRparen }
@@ -215,15 +219,17 @@ data TokenType =
   | TElse
   | TWhile
   | TDo
+  | TLoop
   | TLet
   | TAnd
   | TCase
   | TOf
   | TEq
+  | TColon
   | TPlus
   | TSemicolon
   | TBar
-  | TColon
+  | TComma
   | TLparen
   | TRparen
   | TLbrace
@@ -247,22 +253,5 @@ alexEOF = Alex $ \s@AlexState{ alex_pos = pos, alex_ust = st } ->
             _ -> Right (s, Token pos TEOF)
             where isntBlock (InBlock _ _) = False
                   isntBlock _ = True                  
-
-
-{-
-
-Ideas: looks like we can get rid of the "else exception" -- it will
-disambiguate fine with the ';' provided we put in a precedence for ';'
-
-Should we use a different separator for let blocks?
-
-Need to insert a "then" token before the body of the 'if' block.
-Need to insert a "do" token before the body of a 'while' block
-"of" before the body of a "case"
-
-Use "|" for the separator for case?
-
--}
-
 
 }
