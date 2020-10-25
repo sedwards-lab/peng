@@ -51,13 +51,16 @@ executables:
 
 tests:
   scanner-test:
-    main:		test/ScannerTest.hs
-#    source-dirs:	test
+    main:		unit-tests/ScannerTest.hs
     dependencies:
     - peng
 
   parser-test:
-    main:		test/ParserTest.hs
-#    source-dirs:	test
+    main:		unit-tests/ParserTest.hs
     dependencies:
     - peng
+
+  regression-test:
+    main:		regression-tests/Runtests.hs
+    dependencies:
+    - process

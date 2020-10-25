@@ -24,7 +24,7 @@ data Expr = Id String
           | While Expr Expr
           | Loop Expr
           | IfElse Expr Expr Expr
-          | After Expr String Expr
+          | Later Expr String Expr
           | Assign String Expr
           | Wait [String]
           | Seq Expr Expr
@@ -71,7 +71,7 @@ instance Pretty Expr where
                                                   , pretty e2 ]
                                   , nest 2 $ vsep [ pretty "else"
                                                   , pretty e3 ] ]
-  pretty (After e1 v e2) = pretty "after" <+> pretty e1 <+>
+  pretty (Later e1 v e2) = pretty e1 <+> pretty "later" <+> 
                            pretty v <+> pretty "<-" <+> pretty e2
   pretty (Assign v e) = pretty v <+> pretty "<-" <+> pretty e
   pretty (Wait vars) =

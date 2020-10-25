@@ -123,7 +123,7 @@ astToIR (A.Program decls) = I.Program functions
       emitStmt elseStmt
       emit $ I.Label contLabel
       
-    emitStmt (A.After e1 id e2) = do bind <- lookup id
+    emitStmt (A.Later e1 id e2) = do bind <- lookup id
                                      e2' <- toExpr e2
                                      e1' <- toExpr e1
                                      emit $ I.After e1' bind e2'

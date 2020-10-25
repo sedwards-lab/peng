@@ -51,7 +51,7 @@ tokens :-
     \=    { layout   TEq TSemicolon }
     \:    { keyword TColon }
     do    { doBlock }
-    after { keyword TAfter }
+    later { keyword TLater }
     wait  { keyword TWait }
 
     \<\-  { layout  TLarrow TSemicolon }
@@ -66,12 +66,12 @@ tokens :-
     \{    { lDelimeter TLbrace }
     \}    { rDelimeter TRbrace }
 
-    $digit+ $blank* ns { duration            1 }
-    $digit+ $blank* us { duration         1000 }
-    $digit+ $blank* ms { duration      1000000 }
-    $digit+ $blank* s  { duration   1000000000 }
-    $digit+ $blank* m  { duration  60000000000 }
-    $digit+ $blank* h  { duration 300000000000 }
+    $digit+ $blank* ns { duration             1 }
+    $digit+ $blank* us { duration          1000 }
+    $digit+ $blank* ms { duration       1000000 }
+    $digit+ $blank* s  { duration    1000000000 }
+    $digit+ $blank* m  { duration   60000000000 }
+    $digit+ $blank* h  { duration 3600000000000 }
   
     $digit+ { \ (pos,_,_,s) len ->
                   return $ Token pos $ TInteger $ read $ take len s }
@@ -245,7 +245,7 @@ data TokenType =
   | TAnd
   | TCase
   | TOf
-  | TAfter
+  | TLater
   | TWait
   | TEq
   | TLarrow

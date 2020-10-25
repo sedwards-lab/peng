@@ -31,7 +31,7 @@ import Ast
   'and'   { Token _ TAnd }  
   'case'  { Token _ TCase }
   'of'    { Token _ TOf }
-  'after' { Token _ TAfter }
+  'later' { Token _ TLater }
   'wait'  { Token _ TWait }
   '='     { Token _ TEq }
   '<-'    { Token _ TLarrow }
@@ -92,7 +92,7 @@ expr0 : 'if' expr 'then' expr0 elseOpt  { IfElse $2 $4 $5 }
       | 'while' expr 'do' expr0         { While $2 $4 }
       | 'let' '{' binds '}'             { Let (reverse $3) }
       | 'loop' expr0                    { Loop $2 }
-      | 'after' aexpr id '<-' expr0     { After $2 $3 $5 }
+      | expr0 'later' id '<-' expr0     { Later $1 $3 $5 }
       | 'wait' ids                      { Wait $2 }
       | id '<-' expr0                   { Assign $1 $3 }
       | expr1                           { $1 }
