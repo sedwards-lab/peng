@@ -31,7 +31,10 @@ import Ast
   'and'   { Token _ TAnd }  
   'case'  { Token _ TCase }
   'of'    { Token _ TOf }
+  'after' { Token _ TAfter }
+  'wait'  { Token _ TWait }
   '='     { Token _ TEq }
+  '<-'    { Token _ TLarrow }
   ':'     { Token _ TColon }
   '+'     { Token _ TPlus }
   ';'     { Token _ TSemicolon }
@@ -46,7 +49,7 @@ import Ast
   int     { Token _ (TInteger $$) }  
   string  { Token _ (TString $$) }
   id      { Token _ (TId $$) }
-
+  duration { Token _ (TDuration $$) }
 
 %left ';'
 %nonassoc NOELSE
@@ -85,11 +88,14 @@ typ: id           { TCon $1 }
 expr : expr ';' expr0 { Seq $1 $3 }
      | expr0          { $1 }
 
-expr0 : 'if' expr 'then' expr0 elseOpt { IfElse $2 $4 $5 }
-      | 'while' expr 'do' expr0        { While $2 $4 }
-      | 'let' '{' binds '}'            { Let (reverse $3) }
-      | 'loop' expr0                   { Loop $2 }
-      | expr1                          { $1 }
+expr0 : 'if' expr 'then' expr0 elseOpt  { IfElse $2 $4 $5 }
+      | 'while' expr 'do' expr0         { While $2 $4 }
+      | 'let' '{' binds '}'             { Let (reverse $3) }
+      | 'loop' expr0                    { Loop $2 }
+      | 'after' aexpr id '<-' expr0     { After $2 $3 $5 }
+      | 'wait' ids                      { Wait $2 }
+      | id '<-' expr0                   { Assign $1 $3 }
+      | expr1                           { $1 }
       
 elseOpt : {- nothing -} %prec NOELSE { NoExpr }
         | ';' 'else' expr0           { $3 }
@@ -102,6 +108,7 @@ apply : apply aexpr { Apply $1 $2 }
 
 aexpr : int             { IntLit $1 }
       | string          { StringLit $1 }
+      | duration        { DurLit $1 }
       | id              { Id $1 }
       | '(' expr ')'    { $2 }
       | '{' expr '}'    { $2 }

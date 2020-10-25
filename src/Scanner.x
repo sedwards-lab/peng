@@ -51,7 +51,10 @@ tokens :-
     \=    { layout   TEq TSemicolon }
     \:    { keyword TColon }
     do    { doBlock }
+    after { keyword TAfter }
+    wait  { keyword TWait }
 
+    \<\-  { layout  TLarrow TSemicolon }
     \;    { keyword TSemicolon }
     \|    { keyword TBar }
     \,    { keyword TComma }
@@ -242,7 +245,10 @@ data TokenType =
   | TAnd
   | TCase
   | TOf
+  | TAfter
+  | TWait
   | TEq
+  | TLarrow
   | TColon
   | TPlus
   | TSemicolon

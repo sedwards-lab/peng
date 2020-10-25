@@ -123,13 +123,14 @@ astToIR (A.Program decls) = I.Program functions
       emitStmt elseStmt
       emit $ I.Label contLabel
       
-{-    emitStmt (A.After e1 id e2) = do bind <- lookup id
+    emitStmt (A.After e1 id e2) = do bind <- lookup id
                                      e2' <- toExpr e2
                                      e1' <- toExpr e1
                                      emit $ I.After e1' bind e2'
     emitStmt (A.Wait ids) = do binds <- mapM lookup ids
                                emit $ I.Wait binds
-    emitStmt (A.Call f args) = do args' <- mapM toExpr args
+                               
+{-  emitStmt (A.Call f args) = do args' <- mapM toExpr args
                                   f' <- lookup f
                                   emit $ I.Fork [(f', args')]
     emitStmt (A.Verbatim s) = emit $ I.Verbatim s -}
@@ -174,7 +175,7 @@ astToIR (A.Program decls) = I.Program functions
 
     collectBinders :: A.Expr -> [I.Bind]
     collectBinders _ = []
-{-    
+{-   
     collectBinders (A.Binding b) = convertBind b
     collectBinders (A.Sequence e1 e2) = collectBinders e1 ++ collectBinders e2
     collectBinders (A.Assign _ e) = collectBinders e

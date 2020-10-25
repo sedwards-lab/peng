@@ -1,7 +1,8 @@
 module Main where
 
 import Scanner ( Token(..), TokenType(..), alexMonadScan, runAlex,
-                 AlexPosn(..), Duration(..) )
+                 AlexPosn(..) )
+import Duration       
 
 import Data.List ( intercalate )
 

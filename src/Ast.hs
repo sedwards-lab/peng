@@ -24,6 +24,9 @@ data Expr = Id String
           | While Expr Expr
           | Loop Expr
           | IfElse Expr Expr Expr
+          | After Expr String Expr
+          | Assign String Expr
+          | Wait [String]
           | Seq Expr Expr
 
 data Def = Def String Expr
@@ -47,7 +50,7 @@ instance Pretty Bind where
 instance Pretty Ty where
   pretty (TCon id) = pretty id
   pretty (TApp t (TCon id)) = pretty t <+> pretty id
-  pretty (TApp t1 t2) = parens (pretty t1) <+> pretty t2
+  pretty (TApp t1 t2) = pretty t1 <+> parens (pretty t2)
 
 instance Pretty Expr where
   pretty (Id id) = pretty id
@@ -68,6 +71,11 @@ instance Pretty Expr where
                                                   , pretty e2 ]
                                   , nest 2 $ vsep [ pretty "else"
                                                   , pretty e3 ] ]
+  pretty (After e1 v e2) = pretty "after" <+> pretty e1 <+>
+                           pretty v <+> pretty "<-" <+> pretty e2
+  pretty (Assign v e) = pretty v <+> pretty "<-" <+> pretty e
+  pretty (Wait vars) =
+      pretty "wait" <+> hsep (punctuate comma $ map pretty vars)
   pretty (Seq e1 e2) = vsep [pretty e1, pretty e2]
 
 instance Pretty Def where

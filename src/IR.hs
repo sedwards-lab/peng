@@ -206,3 +206,26 @@ instance Show Expression where
 
 instance Show BinOp where
   show = show . pretty
+
+
+{-
+
+FIXME:
+
+It should be
+
+Ref (Sched Int)
+
+Because Sched should be of kind * -> *
+and Ref should also be of kind * -> *
+(add an attribute to an existing type)
+
+
+"Ref Sched Int"
+
+is probably wrong because in keeping with function application
+syntax parsing, it should be parsed as (Ref Sched) Int,
+which isn't right
+
+
+-}
