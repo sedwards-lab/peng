@@ -23,9 +23,11 @@ data Expr = Id String
           | Let [Def]
           | While Expr Expr
           | Loop Expr
+          | Par Expr
           | IfElse Expr Expr Expr
           | Later Expr Pat Expr
           | Assign Pat Expr
+          | Constraint Expr Ty
           | As String Expr
           | Wait [String]
           | Seq Expr Expr
@@ -75,6 +77,7 @@ instance Pretty Expr where
   pretty (Let defs) = pretty "let" <+> (align $ vsep $ map pretty defs)
   pretty (While e1 e2) = nest 2 $ vsep [ pretty "while" <+> pretty e1, pretty e2 ]
   pretty (Loop e) = nest 2 $ vsep [ pretty "loop", pretty e ]
+  pretty (Par e) = nest 2 $ vsep [ pretty "par", pretty e ]
   pretty (IfElse e1 e2 NoExpr) = nest 2 $ vsep [ pretty "if" <+> pretty e1
                                               , pretty e2 ]
   pretty (IfElse e1 e2 e3) = vsep [ nest 2 $ vsep [ pretty "if" <+> pretty e1
@@ -86,11 +89,12 @@ instance Pretty Expr where
   pretty (Assign v e) = pretty v <+> pretty "<-" <+> pretty e
   pretty (Wait vars) =
       pretty "wait" <+> hsep (punctuate comma $ map pretty vars)
+  pretty (Constraint e t) = pretty e <+> pretty ':' <+> pretty t
   pretty (Seq e1 e2) = vsep [pretty e1, pretty e2]
   pretty Wildcard = pretty '_'
 
 instance Pretty Def where
-  pretty (Def p e) = pretty p <+> pretty '+' <+> pretty e
+  pretty (Def p e) = pretty p <+> pretty '=' <+> pretty e
 
 instance Pretty Pat where
   pretty (PId s) = pretty s

@@ -1,3 +1,6 @@
 .stack-work/
 stack.yaml.lock
 *~
+Parser.info
+runtests.log
+regression-tests/out

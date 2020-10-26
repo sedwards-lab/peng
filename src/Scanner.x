@@ -51,15 +51,19 @@ tokens :-
     \=    { layout   TEq TSemicolon }
     \:    { keyword TColon }
     do    { doBlock }
+    par   { layout  TPar TSemicolon }
     later { keyword TLater }
     wait  { keyword TWait }
 
     \<\-  { layout  TLarrow TSemicolon }
     \;    { keyword TSemicolon }
+    \:    { keyword TColon }
     \|    { keyword TBar }
     \,    { keyword TComma }
     \_    { keyword TUnderscore }
     \@    { keyword TAt }
+    \+    { keyword TPlus }
+    \-    { keyword TMinus }
 
     \(    { lDelimeter TLparen }
     \)    { rDelimeter TRparen }
@@ -242,6 +246,7 @@ data TokenType =
   | TElse
   | TWhile
   | TDo
+  | TPar
   | TLoop
   | TLet
   | TAnd
@@ -253,6 +258,7 @@ data TokenType =
   | TLarrow
   | TColon
   | TPlus
+  | TMinus
   | TSemicolon
   | TBar
   | TComma

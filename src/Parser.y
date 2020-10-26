@@ -26,7 +26,8 @@ import Ast
   'else'  { Token _ TElse }
   'while' { Token _ TWhile }
   'do'    { Token _ TDo }
-  'loop'  { Token _ TLoop }
+  'par'   { Token _ TPar }
+  'loop'  { Token _ TLoop }  
   'let'   { Token _ TLet }
   'and'   { Token _ TAnd }  
   'later' { Token _ TLater }
@@ -35,6 +36,7 @@ import Ast
   '<-'    { Token _ TLarrow }
   ':'     { Token _ TColon }
   '+'     { Token _ TPlus }
+  '-'     { Token _ TMinus }
   ';'     { Token _ TSemicolon }
   ','     { Token _ TComma }
   '_'     { Token _ TUnderscore }
@@ -48,10 +50,10 @@ import Ast
   id      { Token _ (TId $$) }
   duration { Token _ (TDuration $$) }
 
-%left ';'
+%left ';' -- Helps with if-then-else
 %nonassoc NOELSE 'else'
 
-%left '+'
+%left '+' '-'
 
 %%
 
@@ -76,8 +78,8 @@ ids : id          { [$1] }
 typs : typ      { $1 }
      | typs typ { TApp $1 $2 }
     
-typ: id           { TCon $1 }
-   | '(' typs ')' { $2 }
+typ : id           { TCon $1 }
+    | '(' typs ')' { $2 }
 
 expr : expr ';' expr0 { Seq $1 $3 }
      | expr0          { $1 }
@@ -87,15 +89,20 @@ expr0 : 'if' expr 'then' expr0 elseOpt  { IfElse $2 $4 $5 }
       | 'let' '{' decls '}'             { Let (reverse $3) }
       | 'loop' expr0                    { Loop $2 }
       | 'wait' ids                      { Wait $2 }
-      | expr1 'later' expr1 '<-' expr0  { Later $1 (exprToPat $3) $5 }
-      | expr1 '<-' expr0                { Assign (exprToPat $1) $3 }
+      | 'par' expr2                     { Par $2 }
+      | expr2 'later' expr2 '<-' expr0  { Later $1 (exprToPat $3) $5 }
+      | expr2 '<-' expr0                { Assign (exprToPat $1) $3 }
       | id '@' expr0                    { As $1 $3 }
       | expr1                           { $1 }
       
 elseOpt : {- nothing -} %prec NOELSE { NoExpr }
-        | ';' 'else' expr0           { $3 }
+        | ';' 'else' expr1           { $3 }
 
-expr1 : expr1 '+' expr1 { BinOp $1 "+" $3 }
+expr1 : expr1 ':' typs                  { Constraint $1 $3 }
+      | expr2                           { $1 }
+  
+expr2 : expr2 '+' expr2 { BinOp $1 "+" $3 }
+      | expr2 '-' expr2 { BinOp $1 "-" $3 }
       | apply           { $1 }            
 
 apply : apply aexpr { Apply $1 $2 }
@@ -112,7 +119,7 @@ aexpr : int             { IntLit $1 }
 decls : decls 'and' decl  { $3 : $1 }
       | decl              { [$1] }
 
-decl : expr1 '=' aexpr      { Def (exprToPat $1) $3 }
+decl : expr2 '=' aexpr      { Def (exprToPat $1) $3 }
 
        
 {
