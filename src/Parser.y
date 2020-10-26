@@ -34,6 +34,7 @@ import Ast
   'wait'  { Token _ TWait }
   '='     { Token _ TEq }
   '<-'    { Token _ TLarrow }
+  '||'    { Token _ TDBar }
   ':'     { Token _ TColon }
   '+'     { Token _ TPlus }
   '-'     { Token _ TMinus }
@@ -89,7 +90,7 @@ expr0 : 'if' expr 'then' expr0 elseOpt  { IfElse $2 $4 $5 }
       | 'let' '{' decls '}'             { Let (reverse $3) }
       | 'loop' expr0                    { Loop $2 }
       | 'wait' ids                      { Wait $2 }
-      | 'par' expr2                     { Par $2 }
+      | 'par' '{' parExprs '}'          { Par (reverse $3) }
       | expr2 'later' expr2 '<-' expr0  { Later $1 (exprToPat $3) $5 }
       | expr2 '<-' expr0                { Assign (exprToPat $1) $3 }
       | id '@' expr0                    { As $1 $3 }
@@ -118,6 +119,9 @@ aexpr : int             { IntLit $1 }
 
 decls : decls 'and' decl  { $3 : $1 }
       | decl              { [$1] }
+
+parExprs : parExprs '||' expr { $3 : $1 }
+         | expr               { [$1] }
 
 decl : expr2 '=' aexpr      { Def (exprToPat $1) $3 }
 

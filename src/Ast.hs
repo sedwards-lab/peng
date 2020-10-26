@@ -23,7 +23,7 @@ data Expr = Id String
           | Let [Def]
           | While Expr Expr
           | Loop Expr
-          | Par Expr
+          | Par [Expr]
           | IfElse Expr Expr Expr
           | Later Expr Pat Expr
           | Assign Pat Expr
@@ -48,6 +48,9 @@ instance Show Program where
 
 instance Show Expr where
   show e = show $ pretty e
+
+instance Show Def where
+  show d = show $ pretty d
 
 instance Pretty Declaration where
   pretty (Function id formals body) =
@@ -77,7 +80,7 @@ instance Pretty Expr where
   pretty (Let defs) = pretty "let" <+> (align $ vsep $ map pretty defs)
   pretty (While e1 e2) = nest 2 $ vsep [ pretty "while" <+> pretty e1, pretty e2 ]
   pretty (Loop e) = nest 2 $ vsep [ pretty "loop", pretty e ]
-  pretty (Par e) = nest 2 $ vsep [ pretty "par", pretty e ]
+  pretty (Par es) = nest 2 $ vsep $ pretty "par" : map pretty es
   pretty (IfElse e1 e2 NoExpr) = nest 2 $ vsep [ pretty "if" <+> pretty e1
                                               , pretty e2 ]
   pretty (IfElse e1 e2 e3) = vsep [ nest 2 $ vsep [ pretty "if" <+> pretty e1

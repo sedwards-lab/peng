@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
   while (event_queue_len > 0 && now < stop_at) {
     now = next_event_time();
     tick();
-    printf("now %lu  led: %d\n", now, led.value);
+    printf("%12lu led: %d\n", now, led.value);
   }
   return 0;
 }

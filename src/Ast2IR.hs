@@ -77,21 +77,23 @@ astToIR (A.Program decls) = I.Program functions
         body' = generateStatements environment $ emitStmt body
 
     convertFunction _ = Nothing        
-    
+
+{-    
     convertBind :: A.Bind -> [I.Bind]
     convertBind (A.Bind ids t) = map (\id -> I.Bind id t') ids
       where
         t' = convertTy t
+-}
 
     convertTy (A.TCon t) = I.TCon t
     convertTy (A.TApp t1 t2) = I.TApp (convertTy t1) (convertTy t2)
 
     emitStmt :: A.Expr -> IRGenMonad ()
---    emitStmt (A.Binding _) = return ()
+    emitStmt (A.Let defs) = return () -- FIXME
     emitStmt (A.Seq e1 e2) = emitStmt e1 >> emitStmt e2
-{-    emitStmt (A.Assign id e) = do bind <- lookup id
-                                  e' <- toExpr e
-                                  emit $ I.Assign bind e' -}
+    emitStmt (A.Assign (A.PId id) e) = do bind <- lookup id
+                                          e' <- toExpr e
+                                          emit $ I.Assign bind e'
     emitStmt (A.Loop e) = do lab <- freshLabel
                              emit $ I.Label lab
                              emitStmt e
@@ -129,10 +131,22 @@ astToIR (A.Program decls) = I.Program functions
                                              emit $ I.After e1' bind e2'
     emitStmt (A.Wait ids) = do binds <- mapM lookup ids
                                emit $ I.Wait binds
-                               
-{-  emitStmt (A.Call f args) = do args' <- mapM toExpr args
+
+    emitStmt (A.Par exprs) = do branches <- mapM toBranch exprs
+                                emit $ I.Fork branches
+      where
+         toBranch e = let (f, args) = applyToCall e in
+                       do args' <- mapM toExpr args
+                          f' <- lookup f
+                          return (f', args')
+      
+    emitStmt e@(A.Apply _ _) = do args' <- mapM toExpr args
                                   f' <- lookup f
                                   emit $ I.Fork [(f', args')]
+      where (f, args) = applyToCall e
+
+    
+{-  emitStmt (A.Call f args) = do 
     emitStmt (A.Verbatim s) = emit $ I.Verbatim s -}
 
 {-    emitStmt calls@(A.BinOp _ "||" (A.Call _ _)) = do
@@ -143,6 +157,13 @@ astToIR (A.Program decls) = I.Program functions
       
     emitStmt A.NoExpr = return ()
     emitStmt e = error $ "Unsupported statement expression " ++ show e
+
+    applyToCall :: A.Expr -> (String, [A.Expr])
+    applyToCall e = let (A.Id f) : args = reverse $ collectArgs e in (f, args)
+      where
+        collectArgs (A.Apply e1 e2) = e2 : collectArgs e1
+        collectArgs i@(A.Id _) = [i]
+        collectArgs ex = error $ "unsupported expression in apply " ++ show ex
 
     collectCalls _ = []
 {-
@@ -174,21 +195,26 @@ astToIR (A.Program decls) = I.Program functions
     toExpr e = error $ "Unsupported expression " ++ show e
 
     collectBinders :: A.Expr -> [I.Bind]
-    collectBinders _ = []
-{-   
-    collectBinders (A.Binding b) = convertBind b
-    collectBinders (A.Sequence e1 e2) = collectBinders e1 ++ collectBinders e2
-    collectBinders (A.Assign _ e) = collectBinders e
-    collectBinders (A.After e1 _ e2) = collectBinders e1 ++ collectBinders e2
-    collectBinders (A.Loop e) = collectBinders e
-    collectBinders (A.While p e) = collectBinders p ++ collectBinders e
-    collectBinders (A.IfThenElse e1 e2 e3) = concatMap collectBinders [e1,e2,e3]
-    collectBinders A.Wait{} = []
-    collectBinders A.IntLit{} = []
-    collectBinders A.TimeLit{} = []
     collectBinders A.Id{} = []
-    collectBinders (A.Call _ as) = concatMap collectBinders as
+    collectBinders A.IntLit{} = []
+    collectBinders A.StringLit{} = []
+    collectBinders A.DurLit{} = []
+    collectBinders (A.Apply e1 e2) = collectBinders e1 ++ collectBinders e2
     collectBinders (A.BinOp e1 _ e2) = collectBinders e1 ++ collectBinders e2
-    collectBinders A.Verbatim{} = []
     collectBinders A.NoExpr = []
--}
+    collectBinders (A.Let defs) = concatMap collectDefBinder defs
+      where
+        collectDefBinder (A.Def (A.PId v) (A.Constraint e t)) = -- FIXME
+          collectBinders e ++ [I.Bind v (convertTy t)]
+        collectDefBinder d = error $ "unsupported let expression " ++ show d
+    collectBinders (A.While e1 e2) = collectBinders e1 ++ collectBinders e2
+    collectBinders (A.Loop e) = collectBinders e
+    collectBinders (A.Par es) = concatMap collectBinders es
+    collectBinders (A.IfElse e1 e2 e3) = concatMap collectBinders [e1,e2,e3]
+    collectBinders (A.Later e1 _ e2) = collectBinders e1 ++ collectBinders e2
+    collectBinders (A.Assign _ e) = collectBinders e
+    collectBinders (A.Constraint e _) = collectBinders e
+    collectBinders A.As{} = [] -- should just be a pattern
+    collectBinders A.Wait{} = []
+    collectBinders (A.Seq e1 e2)= collectBinders e1 ++ collectBinders e2
+    collectBinders A.Wildcard = []
