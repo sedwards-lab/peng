@@ -58,6 +58,8 @@ tokens :-
     \;    { keyword TSemicolon }
     \|    { keyword TBar }
     \,    { keyword TComma }
+    \_    { keyword TUnderscore }
+    \@    { keyword TAt }
 
     \(    { lDelimeter TLparen }
     \)    { rDelimeter TRparen }
@@ -254,6 +256,8 @@ data TokenType =
   | TSemicolon
   | TBar
   | TComma
+  | TUnderscore
+  | TAt
   | TLparen
   | TRparen
   | TLbrace

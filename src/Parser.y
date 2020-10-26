@@ -29,8 +29,6 @@ import Ast
   'loop'  { Token _ TLoop }
   'let'   { Token _ TLet }
   'and'   { Token _ TAnd }  
-  'case'  { Token _ TCase }
-  'of'    { Token _ TOf }
   'later' { Token _ TLater }
   'wait'  { Token _ TWait }
   '='     { Token _ TEq }
@@ -38,22 +36,20 @@ import Ast
   ':'     { Token _ TColon }
   '+'     { Token _ TPlus }
   ';'     { Token _ TSemicolon }
-  '|'     { Token _ TBar }
   ','     { Token _ TComma }
+  '_'     { Token _ TUnderscore }
+  '@'     { Token _ TAt }
   '('     { Token _ TLparen }
   ')'     { Token _ TRparen }
   '{'     { Token _ TLbrace }
   '}'     { Token _ TRbrace }
-  '['     { Token _ TLbracket }
-  ']'     { Token _ TRbracket }
   int     { Token _ (TInteger $$) }  
   string  { Token _ (TString $$) }
   id      { Token _ (TId $$) }
   duration { Token _ (TDuration $$) }
 
 %left ';'
-%nonassoc NOELSE
-%nonassoc 'else'
+%nonassoc NOELSE 'else'
 
 %left '+'
 
@@ -82,19 +78,18 @@ typs : typ      { $1 }
     
 typ: id           { TCon $1 }
    | '(' typs ')' { $2 }
-   
-
 
 expr : expr ';' expr0 { Seq $1 $3 }
      | expr0          { $1 }
 
 expr0 : 'if' expr 'then' expr0 elseOpt  { IfElse $2 $4 $5 }
       | 'while' expr 'do' expr0         { While $2 $4 }
-      | 'let' '{' binds '}'             { Let (reverse $3) }
+      | 'let' '{' decls '}'             { Let (reverse $3) }
       | 'loop' expr0                    { Loop $2 }
-      | expr0 'later' id '<-' expr0     { Later $1 $3 $5 }
       | 'wait' ids                      { Wait $2 }
-      | id '<-' expr0                   { Assign $1 $3 }
+      | expr1 'later' expr1 '<-' expr0  { Later $1 (exprToPat $3) $5 }
+      | expr1 '<-' expr0                { Assign (exprToPat $1) $3 }
+      | id '@' expr0                    { As $1 $3 }
       | expr1                           { $1 }
       
 elseOpt : {- nothing -} %prec NOELSE { NoExpr }
@@ -110,13 +105,14 @@ aexpr : int             { IntLit $1 }
       | string          { StringLit $1 }
       | duration        { DurLit $1 }
       | id              { Id $1 }
+      | '_'             { Wildcard }
       | '(' expr ')'    { $2 }
       | '{' expr '}'    { $2 }
 
-binds : binds 'and' bind  { $3 : $1 }
-      | bind              { [$1] }
+decls : decls 'and' decl  { $3 : $1 }
+      | decl              { [$1] }
 
-bind : id '=' aexpr       { Def $1 $3 }
+decl : expr1 '=' aexpr      { Def (exprToPat $1) $3 }
 
        
 {
@@ -128,5 +124,17 @@ data Lit = SLit String
 parseError :: Token -> a
 parseError t = error $ case t of
   Token (AlexPn _ l c) _ -> show l ++ ":" ++ show c ++ ":Syntax error"
+
+exprToPat :: Expr -> Pat
+exprToPat (Id s) = PId s
+exprToPat (StringLit s) = PString s
+exprToPat (DurLit d) = PDur d
+exprToPat Wildcard = PWildcard
+exprToPat (As v e) = PAs v (exprToPat e)
+exprToPat (Apply (Id pc) pats) = PCon pc $ patList pats
+ where
+   patList (Apply p1 ps) = exprToPat p1 : patList ps
+   patList e = [exprToPat e]
+exprToPat e = error $ "syntax error in pattern " ++ show e
 
 }

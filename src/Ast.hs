@@ -24,13 +24,22 @@ data Expr = Id String
           | While Expr Expr
           | Loop Expr
           | IfElse Expr Expr Expr
-          | Later Expr String Expr
-          | Assign String Expr
+          | Later Expr Pat Expr
+          | Assign Pat Expr
+          | As String Expr
           | Wait [String]
           | Seq Expr Expr
+          | Wildcard
 
-data Def = Def String Expr
+data Def = Def Pat Expr
 
+data Pat = PId String
+         | PInt Integer
+         | PString String
+         | PDur Duration
+         | PWildcard
+         | PAs String Pat
+         | PCon String [Pat]
 
 instance Show Program where
   show (Program decls) = concatMap (\d -> show (pretty d) ++ "\n\n") decls
@@ -61,6 +70,7 @@ instance Pretty Expr where
   pretty (Apply e1 e2) = parens (pretty e1) <+> pretty e2
   pretty (BinOp e1 op e2) =
     parens (pretty e1) <+> pretty op <+> parens (pretty e2)
+  pretty (As v e) = pretty v <> pretty '@' <> pretty e
   pretty NoExpr = emptyDoc
   pretty (Let defs) = pretty "let" <+> (align $ vsep $ map pretty defs)
   pretty (While e1 e2) = nest 2 $ vsep [ pretty "while" <+> pretty e1, pretty e2 ]
@@ -77,6 +87,16 @@ instance Pretty Expr where
   pretty (Wait vars) =
       pretty "wait" <+> hsep (punctuate comma $ map pretty vars)
   pretty (Seq e1 e2) = vsep [pretty e1, pretty e2]
+  pretty Wildcard = pretty '_'
 
 instance Pretty Def where
-  pretty (Def id e) = pretty id <+> pretty '+' <+> pretty e
+  pretty (Def p e) = pretty p <+> pretty '+' <+> pretty e
+
+instance Pretty Pat where
+  pretty (PId s) = pretty s
+  pretty (PInt i) = pretty i
+  pretty (PString s) = pretty '"' <> pretty s <> pretty '"'
+  pretty (PDur d) = pretty $ show d
+  pretty PWildcard = pretty '_'
+  pretty (PAs v p) = pretty v <> pretty '@' <> pretty p
+  pretty (PCon c ps) = pretty c <+> hsep (map pretty ps)
