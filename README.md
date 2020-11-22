@@ -16,6 +16,7 @@ stack build
 Test with, e.g.,
 
 ````
+cd regression-tests ; ./runtests.sh
 stack test peng:scanner-tests
 stack build peng:parser-tests
 ````
