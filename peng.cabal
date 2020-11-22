@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 696e13db914962ba90633076c78626958b2c171bdd620df8f2331cd90eaa9a17
+-- hash: 87881dc1253d1518dcd1629fc6628c95c21094fd53f17e5321fe86995f33501b
 
 name:           peng
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       CGen
       Duration
       IR
+      ParseOperators
       Parser
       Scanner
   other-modules:
@@ -43,6 +44,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , containers
     , mtl
     , prettyprinter >=1.7.0
   default-language: Haskell2010

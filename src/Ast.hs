@@ -18,7 +18,7 @@ data Expr = Id String
           | StringLit String
           | DurLit Duration
           | Apply Expr Expr
-          | BinOp Expr String Expr
+          | OpRegion Expr OpRegion
           | NoExpr
           | Let [Def]
           | While Expr Expr
@@ -33,6 +33,9 @@ data Expr = Id String
           | Seq Expr Expr
           | Wildcard
 
+data OpRegion = EOR
+              | NextOp String Expr OpRegion
+
 data Def = Def Pat Expr
 
 data Pat = PId String
@@ -42,6 +45,23 @@ data Pat = PId String
          | PWildcard
          | PAs String Pat
          | PCon String [Pat]
+
+rewrite :: (Expr -> Expr) -> Expr -> Expr
+rewrite f (Apply e1 e2) = Apply (f e1) (f e2)
+rewrite f (OpRegion e r) = OpRegion (f e) (h r)
+  where h EOR = EOR
+        h (NextOp op e' r') = NextOp op (f e') (h r')
+rewrite f (Let d) = Let $ map (\(Def p e) -> Def p (f e)) d
+rewrite f (While e1 e2) = While (f e1) (f e2)
+rewrite f (Loop e) = Loop (f e)
+rewrite f (Par e) = Par $ map f e
+rewrite f (IfElse e1 e2 e3) = IfElse (f e1) (f e2) (f e3)
+rewrite f (Later e1 p e2) = Later (f e1) p (f e2)
+rewrite f (Assign p e) = Assign p (f e)
+rewrite f (Constraint e t) = Constraint (f e) t
+rewrite f (As s e) = As s (f e)
+rewrite f (Seq e1 e2) = Seq (f e1) (f e2)
+rewrite _ e = e
 
 instance Show Program where
   show (Program decls) = concatMap (\d -> show (pretty d) ++ "\n\n") decls
@@ -73,8 +93,9 @@ instance Pretty Expr where
   pretty (DurLit d) = pretty $ show d
   pretty (Apply (Id id) e) = pretty id <+> pretty e
   pretty (Apply e1 e2) = parens (pretty e1) <+> pretty e2
-  pretty (BinOp e1 op e2) =
-    parens (pretty e1) <+> pretty op <+> parens (pretty e2)
+  pretty (OpRegion e1 r) = parens (pretty e1 <> p r)
+    where p EOR = emptyDoc
+          p (NextOp s e r') = space <> pretty s <+> pretty e <> p r'
   pretty (As v e) = pretty v <> pretty '@' <> pretty e
   pretty NoExpr = emptyDoc
   pretty (Let defs) = pretty "let" <+> (align $ vsep $ map pretty defs)

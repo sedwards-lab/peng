@@ -99,8 +99,11 @@ elseOpt : {- nothing -} %prec NOELSE { NoExpr }
 expr1 : expr1 ':' typs                  { Constraint $1 $3 }
       | expr2                           { $1 }
   
-expr2 : expr2 op apply  { BinOp $1 $2 $3 }
-      | apply           { $1 }            
+expr2 : apply opregion  { OpRegion $1 $2 }
+      | apply           { $1 }
+
+opregion : op apply opregion { NextOp $1 $2 $3 }
+         | op apply          { NextOp $1 $2 EOR }
 
 apply : apply aexpr { Apply $1 $2 }
       | aexpr       { $1 }

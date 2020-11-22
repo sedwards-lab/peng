@@ -6,9 +6,13 @@ module Main where
 import Scanner ( runAlex )
 import Parser  ( parse )
 
+import ParseOperators ( parseOperators, Fixity(..) )
+
 --import Ast ( printAST )
 import Ast2IR  ( astToIR )
 import CGen ( cgen, hgen )
+
+import qualified Ast as A
 
 import System.Environment (getArgs, getProgName)
 import System.Console.GetOpt (getOpt, usageInfo, OptDescr(..),
@@ -19,6 +23,7 @@ import Control.Monad( when, unless )
 
 data Mode = DumpIR
           | DumpAST
+          | DumpASTP
           | GenerateC
           | GenerateH
   deriving (Eq, Show)
@@ -48,6 +53,9 @@ optionDescriptions =
     , Option "" ["dump-ast"]
         (NoArg (\ opt -> return opt { optMode = DumpAST }))
         "Print the AST"      
+    , Option "" ["dump-ast-parsed"]
+        (NoArg (\ opt -> return opt { optMode = DumpASTP }))
+        "Print the AST after operators are parsed"      
     , Option "" ["dump-ir"]
         (NoArg (\ opt -> return opt { optMode = DumpIR }))
         "Print the IR"
@@ -61,6 +69,14 @@ optionDescriptions =
         (ReqArg (\mn opt -> return opt { modName = mn }) "<module-name>")
         "Set the module name"
     ]
+
+defaultOps :: [Fixity]      -- FIXME
+defaultOps = [Infixl 6 "+"
+             ,Infixl 6 "-"
+             ,Infixl 7 "*"
+             ,Infixl 8 "/"
+             ,Infixr 8 "^"
+             ]
 
 main :: IO ()
 main = do
@@ -88,7 +104,14 @@ main = do
 
   when (optMode == DumpAST) $ print ast >> exitSuccess
 
-  let ir = astToIR ast
+  -- FIXME: Should take into account fixity definitions in the program
+  let A.Program decls = ast
+      ast' = A.Program $ map helper decls
+      helper (A.Function s bs e) = A.Function s bs $ parseOperators defaultOps e
+
+  when (optMode == DumpASTP) $ print ast' >> exitSuccess
+
+  let ir = astToIR ast'
 
   when (optMode == DumpIR) $ print ir >> exitSuccess
 

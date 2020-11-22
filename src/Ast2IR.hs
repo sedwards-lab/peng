@@ -177,7 +177,7 @@ astToIR (A.Program decls) = I.Program functions
     toExpr (A.IntLit i) = return $ I.IntLit i I.intTy
     toExpr (A.DurLit d) = return $ I.DurLit d I.timeTy
     toExpr (A.Id v) = I.Var <$> lookup v
-    toExpr (A.BinOp e1 op e2) = do
+    toExpr (A.Apply (A.Apply (A.Id op) e1) e2) = do -- FIXME: incomplete
       e1' <- toExpr e1
       e2' <- toExpr e2
       let (op', ty) = case op of
@@ -200,7 +200,9 @@ astToIR (A.Program decls) = I.Program functions
     collectBinders A.StringLit{} = []
     collectBinders A.DurLit{} = []
     collectBinders (A.Apply e1 e2) = collectBinders e1 ++ collectBinders e2
-    collectBinders (A.BinOp e1 _ e2) = collectBinders e1 ++ collectBinders e2
+    collectBinders (A.OpRegion e r) = collectBinders e ++ helper r
+      where helper A.EOR = []
+            helper (A.NextOp _ e' r') = collectBinders e' ++ helper r'
     collectBinders A.NoExpr = []
     collectBinders (A.Let defs) = concatMap collectDefBinder defs
       where
