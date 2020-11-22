@@ -15,6 +15,8 @@ $digit   = 0-9
 $blank   = [\ \t]
 @newline = [\n] | [\r][\n] | [\r]
 @identifier = [a-zA-Z] [a-zA-Z0-9_']*
+$symbol = [\!\#\$\%\&\*\+\-\.\/\<\=\>\?\@\\\^\|\~]
+@operator = $symbol ( $symbol | [\_\:\"\'] )*
 
 tokens :-
 
@@ -63,8 +65,6 @@ tokens :-
     \,    { keyword TComma }
     \_    { keyword TUnderscore }
     \@    { keyword TAt }
-    \+    { keyword TPlus }
-    \-    { keyword TMinus }
 
     \(    { lDelimeter TLparen }
     \)    { rDelimeter TRparen }
@@ -82,6 +82,11 @@ tokens :-
   
     $digit+ { \ (pos,_,_,s) len ->
                   return $ Token pos $ TInteger $ read $ take len s }
+
+    @operator { \ (pos,_,_,s) len -> return $ Token pos $ TOp $ take len s }
+
+    \` @identifier \` { \ (pos,_,_,_:s) len ->
+                          return $ Token pos $ TOp $ take (len - 2) s }
 
     @identifier { \ (pos,_,_,s) len -> return $ Token pos $ TId $ take len s }
   }
@@ -259,8 +264,6 @@ data TokenType =
   | TLarrow
   | TDBar
   | TColon
-  | TPlus
-  | TMinus
   | TSemicolon
   | TBar
   | TComma
@@ -275,6 +278,7 @@ data TokenType =
   | TInteger Integer
   | TString String
   | TId String
+  | TOp String
   | TDuration Duration
   deriving (Eq, Show)
 

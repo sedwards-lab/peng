@@ -36,8 +36,6 @@ import Ast
   '<-'    { Token _ TLarrow }
   '||'    { Token _ TDBar }
   ':'     { Token _ TColon }
-  '+'     { Token _ TPlus }
-  '-'     { Token _ TMinus }
   ';'     { Token _ TSemicolon }
   ','     { Token _ TComma }
   '_'     { Token _ TUnderscore }
@@ -48,13 +46,12 @@ import Ast
   '}'     { Token _ TRbrace }
   int     { Token _ (TInteger $$) }  
   string  { Token _ (TString $$) }
+  op      { Token _ (TOp $$) }
   id      { Token _ (TId $$) }
   duration { Token _ (TDuration $$) }
 
 %left ';' -- Helps with if-then-else
 %nonassoc NOELSE 'else'
-
-%left '+' '-'
 
 %%
 
@@ -102,8 +99,7 @@ elseOpt : {- nothing -} %prec NOELSE { NoExpr }
 expr1 : expr1 ':' typs                  { Constraint $1 $3 }
       | expr2                           { $1 }
   
-expr2 : expr2 '+' expr2 { BinOp $1 "+" $3 }
-      | expr2 '-' expr2 { BinOp $1 "-" $3 }
+expr2 : expr2 op apply  { BinOp $1 $2 $3 }
       | apply           { $1 }            
 
 apply : apply aexpr { Apply $1 $2 }

@@ -377,6 +377,34 @@ main = do putStrLn "Scanner test"
                       ]
              "42 42 ns 41 us 40 ms 2 s 3m  4     h"
 
+          checkTokens [Token (AlexPn 1 1 2) (TOp "!")
+                      ,Token (AlexPn 3 1 4) (TOp "#")
+                      ,Token (AlexPn 5 1 6) (TOp "$")
+                      ,Token (AlexPn 7 1 8) (TOp "%")
+                      ,Token (AlexPn 9 1 10) (TOp "&")
+                      ,Token (AlexPn 11 1 12) (TOp "*")
+                      ,Token (AlexPn 13 1 14) (TOp "+")
+                      ,Token (AlexPn 15 1 16) (TOp ".")
+                      ,Token (AlexPn 17 1 18) (TOp "/")
+                      ,Token (AlexPn 19 1 20) (TOp "<")
+                      ,Token (AlexPn 21 1 22) (TOp "='")
+                      ,Token (AlexPn 24 1 25) (TOp ">")
+                      ,Token (AlexPn 26 1 27) (TOp "?")
+                      ,Token (AlexPn 28 1 29) (TOp "@_")
+                      ,Token (AlexPn 31 1 32) (TOp "\\")
+                      ,Token (AlexPn 33 1 34) (TOp "^")
+                      ,Token (AlexPn 35 1 36) (TOp "|\"")
+                      ,Token (AlexPn 38 1 39) (TOp "-")
+                      ,Token (AlexPn 40 1 41) (TOp "~")
+                      ,Token (AlexPn 42 1 43) (TOp "!_:\"'")]
+            " ! # $ % & * + . / < =' > ? @_ \\ ^ |\" - ~ !_:\"'  "
+
+          checkTokens [Token (AlexPn 1 1 2) (TOp "add")
+                      ,Token (AlexPn 7 1 8) (TOp "plus")
+                      ,Token (AlexPn 14 1 15) (TOp "foo_42_bar'")]
+            " `add` `plus` `foo_42_bar'`"
+           
+
 
 {-
 if do one
