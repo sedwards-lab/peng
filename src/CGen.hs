@@ -432,10 +432,10 @@ toFunc (I.Function (I.Bind fname _) formals locals body) =
             I.GT -> Gt
             I.GE -> Ge
             I.NE -> Neq
-            _ -> error $ "unsupported operator " ++ show op
+            -- _ -> error $ "unsupported operator " ++ show op
       return $ Binary e1' op' e2'
     
-    genExpr e = error $ "unsupported expression " ++ show e
+    -- genExpr e = error $ "unsupported expression " ++ show e
 
     -- Return an expression that is a pointer to the given variable
     -- and the type (after removing any Ref)

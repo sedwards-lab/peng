@@ -108,9 +108,9 @@ opregion : op apply opregion { NextOp $1 $2 $3 }
 apply : apply aexpr { Apply $1 $2 }
       | aexpr       { $1 }
 
-aexpr : int             { IntLit $1 }
-      | string          { StringLit $1 }
-      | duration        { DurLit $1 }
+aexpr : int             { Literal (IntLit $1) }
+      | string          { Literal (StringLit $1) }
+      | duration        { Literal (DurLit $1) }
       | id              { Id $1 }
       | '_'             { Wildcard }
       | '(' expr ')'    { $2 }
@@ -137,8 +137,7 @@ parseError t = error $ case t of
 
 exprToPat :: Expr -> Pat
 exprToPat (Id s) = PId s
-exprToPat (StringLit s) = PString s
-exprToPat (DurLit d) = PDur d
+exprToPat (Literal l) = PLiteral l
 exprToPat Wildcard = PWildcard
 exprToPat (As v e) = PAs v (exprToPat e)
 exprToPat (Apply (Id pc) pats) = PCon pc $ patList pats

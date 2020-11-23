@@ -29,10 +29,14 @@ data Bind = Bind [VarId] Ty
 data Ty = TCon TConId
         | TApp Ty Ty
 
+data Lit = IntLit Integer
+         | StringLit String
+         | DurLit Duration
+         | RatLit Rational
+         | CharLit Char
+
 data Expr = Id VarId
-          | IntLit Integer
-          | StringLit String
-          | DurLit Duration
+          | Literal Lit
           | Apply Expr Expr
           | OpRegion Expr OpRegion
           | NoExpr
@@ -55,9 +59,7 @@ data OpRegion = EOR
 data Def = Def Pat Expr
 
 data Pat = PId VarId
-         | PInt Integer
-         | PString String
-         | PDur Duration
+         | PLiteral Lit
          | PWildcard
          | PAs VarId Pat
          | PCon TConId [Pat]
@@ -102,11 +104,16 @@ instance Pretty Ty where
   pretty (TApp t (TCon id)) = pretty t <+> pretty id
   pretty (TApp t1 t2) = pretty t1 <+> parens (pretty t2)
 
-instance Pretty Expr where
-  pretty (Id id) = pretty id
+instance Pretty Lit where
   pretty (IntLit i) = pretty i
   pretty (StringLit s) = pretty '"' <> pretty s <> pretty '"'
   pretty (DurLit d) = pretty $ show d
+  pretty (RatLit r) = pretty $ show r
+  pretty (CharLit c) = pretty '\'' <> pretty c <> pretty '\''
+
+instance Pretty Expr where
+  pretty (Id id) = pretty id
+  pretty (Literal l) = pretty l
   pretty (Apply (Id id) e) = pretty id <+> pretty e
   pretty (Apply e1 e2) = parens (pretty e1) <+> pretty e2
   pretty (OpRegion e1 r) = parens (pretty e1 <> p r)
@@ -138,9 +145,7 @@ instance Pretty Def where
 
 instance Pretty Pat where
   pretty (PId s) = pretty s
-  pretty (PInt i) = pretty i
-  pretty (PString s) = pretty '"' <> pretty s <> pretty '"'
-  pretty (PDur d) = pretty $ show d
+  pretty (PLiteral l) = pretty l
   pretty PWildcard = pretty '_'
   pretty (PAs v p) = pretty v <> pretty '@' <> pretty p
   pretty (PCon c ps) = pretty c <+> hsep (map pretty ps)

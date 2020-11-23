@@ -53,7 +53,7 @@ astToIR (A.Program decls) = I.Program functions
       mapMaybe bindOfDecl decls
 
     bindOfDecl decl@(A.Function name _ _) = Just $ I.Bind name $ typeOfDecl decl
-    bindOfDecl _ = Nothing
+    --bindOfDecl _ = Nothing
     
     typeOfDecl (A.Function _ formals _) =
       I.functionType (formalTypes ++ [resultType])
@@ -62,7 +62,7 @@ astToIR (A.Program decls) = I.Program functions
         formalTypes = concatMap bindTypes formals
         bindTypes (A.Bind ids t) = map (\_ -> t') ids
           where t' = convertTy t
-    typeOfDecl _ = error "typeOfDecl called on a non-function"
+    --typeOfDecl _ = error "typeOfDecl called on a non-function"
 
     convertFunction decl@(A.Function fname formalArgs body) =
       Just $ I.Function bind formals locals body'
@@ -76,7 +76,7 @@ astToIR (A.Program decls) = I.Program functions
         environment = locals ++ formals ++ topDefs
         body' = generateStatements environment $ emitStmt body
 
-    convertFunction _ = Nothing        
+    --convertFunction _ = Nothing        
 
 {-    
     convertBind :: A.Bind -> [I.Bind]
@@ -89,7 +89,7 @@ astToIR (A.Program decls) = I.Program functions
     convertTy (A.TApp t1 t2) = I.TApp (convertTy t1) (convertTy t2)
 
     emitStmt :: A.Expr -> IRGenMonad ()
-    emitStmt (A.Let defs) = return () -- FIXME
+    emitStmt (A.Let _) = return () -- FIXME
     emitStmt (A.Seq e1 e2) = emitStmt e1 >> emitStmt e2
     emitStmt (A.Assign (A.PId id) e) = do bind <- lookup id
                                           e' <- toExpr e
@@ -165,7 +165,7 @@ astToIR (A.Program decls) = I.Program functions
         collectArgs i@(A.Id _) = [i]
         collectArgs ex = error $ "unsupported expression in apply " ++ show ex
 
-    collectCalls _ = []
+--    collectCalls _ = []
 {-
     collectCalls (A.Call f args) = [(f, args)]
     collectCalls (A.BinOp calls "||" (A.Call f1 a1)) =
@@ -174,8 +174,8 @@ astToIR (A.Program decls) = I.Program functions
 -}
 
     toExpr :: A.Expr -> IRGenMonad I.Expression
-    toExpr (A.IntLit i) = return $ I.IntLit i I.intTy
-    toExpr (A.DurLit d) = return $ I.DurLit d I.timeTy
+    toExpr (A.Literal (A.IntLit i)) = return $ I.IntLit i I.intTy
+    toExpr (A.Literal (A.DurLit d)) = return $ I.DurLit d I.timeTy
     toExpr (A.Id v) = I.Var <$> lookup v
     toExpr (A.Apply (A.Apply (A.Id op) e1) e2) = do -- FIXME: incomplete
       e1' <- toExpr e1
@@ -196,9 +196,7 @@ astToIR (A.Program decls) = I.Program functions
 
     collectBinders :: A.Expr -> [I.Bind]
     collectBinders A.Id{} = []
-    collectBinders A.IntLit{} = []
-    collectBinders A.StringLit{} = []
-    collectBinders A.DurLit{} = []
+    collectBinders A.Literal{} = []
     collectBinders (A.Apply e1 e2) = collectBinders e1 ++ collectBinders e2
     collectBinders (A.OpRegion e r) = collectBinders e ++ helper r
       where helper A.EOR = []
