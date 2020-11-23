@@ -14,8 +14,9 @@
 
 module TypeInference where
 
+--import Ast
 --import qualified Ast as A
-import Ast ( TVarId, TConId, TClassId, VarId )
+import Ast ( TVarId, TConId, TClassId, VarId, Lit(..) )
 
 import Data.List( union, nub, intersect )
 import Control.Monad ( msum, liftM, ap )
@@ -448,3 +449,37 @@ instance Instantiate Pred where
 freshInst :: Scheme -> TI (Qual Type)
 freshInst (Forall ks qt) = do ts <- mapM newTVar ks
                               return $ inst ts qt
+
+------------------------------ Built-in types
+
+tUnit, tChar, tInt, tInteger, tFloat, tDouble,        
+  tList, tDuration, tArrow, tTuple2, tString :: Type
+
+tUnit     = TCon (Tycon "()"      Star)
+tChar     = TCon (Tycon "Char"    Star)
+tInt      = TCon (Tycon "Int"     Star)
+tInteger  = TCon (Tycon "Integer" Star)
+tFloat    = TCon (Tycon "Float"   Star)
+tDouble   = TCon (Tycon "Double"  Star)
+tList     = TCon (Tycon "[]"      (Kfun Star Star))
+tDuration = TCon (Tycon "Duration" Star)
+tArrow    = TCon (Tycon "(->)"    (Kfun Star (Kfun Star Star)))
+tTuple2   = TCon (Tycon "(,)"     (Kfun Star (Kfun Star Star)))
+
+tString   = TAp tList tChar       -- type String = [Char]
+
+
+
+------------------------------ Type Inference for the AST
+
+-- | Type inference for a literal: Chars and Strings are a specific type;
+--   Integer and Rational literals are part of the Num and Fractional
+--   typeclasses
+tiLit                :: Lit -> TI ([Pred], Type)
+tiLit (IntLit _)     = do v <- newTVar Star
+                          return ([IsIn "Num" v], v)
+tiLit (StringLit _)  = return ([], tString)
+tiLit (DurLit _)     = return ([], tDuration)
+tiLit (RatLit _)     = do v <- newTVar Star
+                          return ([IsIn "Fractional" v], v)
+tiLit (CharLit _)    = return ([], tChar)
