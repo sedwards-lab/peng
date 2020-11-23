@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 87881dc1253d1518dcd1629fc6628c95c21094fd53f17e5321fe86995f33501b
+-- hash: a32f5b6a555c2becc10686b60cb8fb1ddc0924f2a2e25031ca0a8b17adaa7228
 
 name:           peng
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       ParseOperators
       Parser
       Scanner
+      TypeInference
   other-modules:
       Paths_peng
   hs-source-dirs:

@@ -4,16 +4,32 @@ import Prettyprinter
 import Prelude hiding ( (<>), id )
 import Duration
 
+-- | A type variable name (e.g., a, b)
+type TVarId = String
+
+-- | A type constructor name (e.g., Int, Bool)
+type TConId = String
+
+-- | A type class name (e.g., Eq, Ord)
+type TClassId = String
+
+-- | A variable name (e.g., x, y, f)
+type VarId = String
+
+-- | An operator name (e.g., +, foo)
+type OperatorId = String
+
+
 data Program = Program [Declaration]
 
-data Declaration = Function String [Bind] Expr
+data Declaration = Function VarId [Bind] Expr
 
-data Bind = Bind [String] Ty
+data Bind = Bind [VarId] Ty
 
-data Ty = TCon String
+data Ty = TCon TConId
         | TApp Ty Ty
 
-data Expr = Id String
+data Expr = Id VarId
           | IntLit Integer
           | StringLit String
           | DurLit Duration
@@ -28,23 +44,23 @@ data Expr = Id String
           | Later Expr Pat Expr
           | Assign Pat Expr
           | Constraint Expr Ty
-          | As String Expr
-          | Wait [String]
+          | As VarId Expr
+          | Wait [VarId]
           | Seq Expr Expr
           | Wildcard
 
 data OpRegion = EOR
-              | NextOp String Expr OpRegion
+              | NextOp OperatorId Expr OpRegion
 
 data Def = Def Pat Expr
 
-data Pat = PId String
+data Pat = PId VarId
          | PInt Integer
          | PString String
          | PDur Duration
          | PWildcard
-         | PAs String Pat
-         | PCon String [Pat]
+         | PAs VarId Pat
+         | PCon TConId [Pat]
 
 rewrite :: (Expr -> Expr) -> Expr -> Expr
 rewrite f (Apply e1 e2) = Apply (f e1) (f e2)
