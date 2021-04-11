@@ -1,5 +1,69 @@
 # Variable Semantics
 
+## Proposal (2021-04-12)
+
+### Summary
+
+#### Indirection
+
+-   There are primitive *data types*, and then there are *reference types* which
+    "point to" data types.
+
+-   There are algebraic *lifetimes*, which indicate "how long" a value is to live.
+    Lifetimes form a partially-ordered set.
+
+-   Reference types are parametrized by the data type they point to, and by the
+    lifetime of value they point to. References should never outlive the data
+    they point to.
+
+-   There are *let-bindings*, which simply bind a variable to a value, and then
+    there are *var-declarations*, which allocate (mutable) storage for values.
+    Var-declarations produce references scoped to the lifetime of the activation
+    record on which they allocate a value.
+
+-   Function/routine parameters are *immutable*. This eliminates the distinction
+    behind pass-by-value vs -by-reference semantics, and allows language
+    implementations to choose whichever is most appropriate.
+
+-   *Delayed assignments* may be made to references. (Regular) assignments are
+    simply a special case of delayed assignments with delay time 0 (and are only
+    "felt" by awaiting processes of a lower priority). There is no separate
+    "schedulable" type; they are one and the same as references.
+
+#### Arrays and Slices
+
+-   There are *constant-size arrays*, whose size is part of the type.
+
+-   *Slices* are a reference type that point to some collection of values, and
+    whose size is known only at runtime. These are implemented using "fat
+    pointers", which store a length and a pointer to the first variable.
+
+-   Slices are indexed by integers, and yield an optional value.
+
+-   Shorter slices may always be taken from longer slices, but once shortened,
+    a slice cannot grow.
+
+-   *Plain references* (colloquially, just "references") may be thought of as
+    a special case of slices of size 1, where the size is known at runtime.
+
+-   Plain references to constant-size array types may be promoted to slices.
+
+-   Since they are reference types, slices are parametrized by a single lifetime.
+
+-   Delayed assignments may be made to any item pointed to by a slice.
+
+-   Waiting on a slice blocks until any of the underlying items is assigned to.
+
+Possible coercions:
+
+```
+[n of T] -> [m of T] -> where m < n
+[n of T] -> m -> T, where m < n
+[n of T] -> [T]
+[T] -> ?&T
+&T -> T
+```
+
 ## Survey of Languages
 
 The languages of interest below are chosen because they are all compiled systems
