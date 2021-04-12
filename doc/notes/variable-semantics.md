@@ -2,67 +2,185 @@
 
 ## Proposal (2021-04-12)
 
-### Summary
+There are primitive *data types*, and then there are *reference types* which
+"point to" data types. The particular sorts of data types are not particularly
+important here, though they are understood to correspond with "primitive" values
+used for computation, such as the integers, booleans, etc.
 
-#### Indirection
+### Bindings
 
--   There are primitive *data types*, and then there are *reference types* which
-    "point to" data types.
+*Let-bindings*, or just "bindings", bind an identifier to a value, and are not
+guaranteed to be allocated storage in the running activation record. The syntax
+to bind the value of expression `expr` to `x` is written as follows:
 
--   There are algebraic *lifetimes*, which indicate "how long" a value is to live.
-    Lifetimes form a partially-ordered set.
+    let x = expr
 
--   Reference types are parametrized by the data type they point to, and by the
-    lifetime of value they point to. References should never outlive the data
-    they point to.
+`x` may be used in subsequent expressions, and its value will be that of `expr`.
+A let-binding may be optionally annotated with the type `T` of `expr`:
 
--   There are *let-bindings*, which simply bind a variable to a value, and then
-    there are *var-declarations*, which allocate (mutable) storage for values.
-    Var-declarations produce references scoped to the lifetime of the activation
-    record on which they allocate a value.
+    let x: T = expr
 
--   Function/routine parameters are *immutable*. This eliminates the distinction
-    behind pass-by-value vs -by-reference semantics, and allows language
-    implementations to choose whichever is most appropriate.
+Note that references may not be taken to of let-bound variables. Let-bound
+variables may be shadowed.
 
--   *Delayed assignments* may be made to references. (Regular) assignments are
-    simply a special case of delayed assignments with delay time 0 (and are only
-    "felt" by awaiting processes of a lower priority). There is no separate
-    "schedulable" type; they are one and the same as references.
+(Aesthetic note: I don't really like `=` as the token separating the identifier
+and the expression. I think `:=` is a nice alternative, or `<-`.)
 
-#### Arrays and Slices
+### Declarations and references
 
--   There are *constant-size arrays*, whose size is part of the type.
+Bindings contrast *var-declarations*, or just "declarations", which allocate
+storage for values in the current activation record. A declaration of variable
+`r`, initialized to the value of expression `expr` is written:
 
--   *Slices* are a reference type that point to some collection of values, and
-    whose size is known only at runtime. These are implemented using "fat
-    pointers", which store a length and a pointer to the first variable.
+    var r = expr
 
--   Slices are indexed by integers, and yield an optional value.
+(We defer introducing type annotations declarations until we explain the syntax
+for reference types.)
 
--   Shorter slices may always be taken from longer slices, but once shortened,
-    a slice cannot grow.
+Declarations bind identifiers to references which may be used to access or
+modify the underlying value. References need not be explicitly dereferenced to
+obtain their value. This means that the following will bind the _value_ of `r`
+to `x`:
 
--   *Plain references* (colloquially, just "references") may be thought of as
-    a special case of slices of size 1, where the size is known at runtime.
+    let x = r
 
--   Plain references to constant-size array types may be promoted to slices.
+References are themselves values; to *alias* the reference `r` to `x`, we use
+the `&` operator to take the reference value of `r` and bind it to `x`:
 
--   Since they are reference types, slices are parametrized by a single lifetime.
+    let x = &r
 
--   Delayed assignments may be made to any item pointed to by a slice.
+References cannot be taken of let-bound variables.
 
--   Waiting on a slice blocks until any of the underlying items is assigned to.
+Reference types are also designated by the `&` type constructor. There are
+details omitted here for now, but as an example, a reference to an integer is
+written (whitespace optional):
 
-Possible coercions:
+    & Int
 
-```
-[n of T] -> [m of T] -> where m < n
-[n of T] -> m -> T, where m < n
-[n of T] -> [T]
-[T] -> ?&T
-&T -> T
-```
+### Routine parameters and delayed assignment
+
+Routine parameters are *immutable*, and should be treated like local
+let-bindings. This eliminates the distinction behind pass-by-value vs
+-by-reference semantics, and allows language implementations to choose whichever
+is most appropriate.
+
+References may also be passed in by value, and can be used to mutate non-local
+variables. For example, the following routine `isEven` receives parameters `n`,
+an integer value, and `r`, a boolean reference. It "returns" its result to `r`
+by assigning to it (with the `<-` operator):
+
+    isEven (n: Int, r: &Bool) =
+      r <- n % 2 == 0
+
+Variables introduced by let-bindings nor parameters cannot be assigned to using
+the `<-` operator.
+
+*Delayed assignments* may be made to references. For instance, the following
+`blink` routine alternates between writing 1s and 0s to `led` every 50ms:
+
+    blink (led: &Int) =
+      loop
+        50ms later led <- 1
+        wait led
+        50ms later led <- 0
+        wait led
+
+Regular assignments are simply a special case of delayed assignments with delay
+time 0. So the following two statements are semantically equivalent:
+
+    r <- v
+    0s later r <- v
+
+(Aesthetic note: `later` as a keyword seems a bit cumbersome. Perhaps use an
+operator like `..`?)
+
+### Arrays and slices
+
+For any type `T` and positive (non-zero) integer `n`, we have *constant-size
+arrays*, denoted as `[n of T]`. We can construct constant-size array values
+using array notation, using either let-bindings or var-declarations:
+
+    let a: [3 of Int] = [1, 2, 3]
+    var b: &[3 of Int] = a
+
+We can retrieve the value stored at some index using array access notation.
+For some array `a: [n of T]` and integer `i`, the return type of `a[i]` is `?T`,
+where `?` is the type constructor for the optional ("maybe") type. It returns
+`Some x` when `i < n` and `None` otherwise.
+
+*Slices* are a reference type that point to some collection of values, and
+whose size is known only at runtime. A slice of type `T` is denoted by `[T]`.
+Slices can be taken from references of array values using the prefix `[]` operator.
+Continuing from the example from before:
+
+    let c: [Int] = []b
+
+Note that, strictly speaking, we must first var-declare an array before we can
+obtain a slice to it from its reference. We use the following syntax sugar to do
+both (with the optional type annotation):
+
+    var []c: [Int] = a
+
+Note that in this case, `a` must be an expression whose type is an `Int` array.
+
+Slices are implemented using "fat pointers", which store a length, a pointer to
+the underlying struct's `cv_t`, and an index to the first element of the slice.
+To check the length of an array, we use the `.len()` method, e.g., `c.len()`.
+Like arrays, slices can be indexed using array access notation, and return an
+optional type.
+
+Shorter slices may always be taken from longer slices, but once shortened,
+a slice cannot grow. To take a slice of all but the first element of `c`, we
+may write:
+
+    assert(c.len() == 3)
+    let d: [Int] = c[1:]
+    assert(d.len() == 2)
+
+Slices that are out of range yield empty slices:
+
+    let e: [Int] = c[42:]
+    assert(e.len() == 0)
+
+Note that plain references may be thought of as a special case of slices of
+size 1, where the size is known at runtime. One can also retrieve an optional
+reference from some index using a reference array access:
+
+    let x: ?Int = c[&0]
+
+Delayed assignments may be made to any item pointed to by a slice. Waiting on
+a slice blocks until any of the underlying items is assigned to (disjunctive
+semantics). Routines may also block on individual elements or sub-slices.
+
+### Lifetimes
+
+*Lifetimes* indicate "how long" the storage underlying a reference will live.
+Var-declarations produce storage whose lifetime is tied to the lexical scope of
+the variable. When the variable goes out of scope, it is said to be *dropped*,
+and the underlying storage on the activation record may be made available for
+allocating other data.
+
+Lifetimes are totally ordered at runtime. We say `a <= b` if and only if values
+of lifetime `a` are dropped before or at the same time as values of lifetime
+`b`. We may not know the runtime order of lifetimes at compile-time, so they
+appear in our type system as a partially-ordered set, where the relation `<=` is
+reflexive and transitive. A greater lifetime can always be coerced to a smaller
+lifetime.
+
+The central tenet of our lifetime system is that *references should never
+outlive the data they point to*. Reference types are parametrized by the
+lifetime of the data they point to; a reference parametrized by lifetime `a`
+may only point to values of lifetime `b` where `a <= b`.
+
+TODO: formalize based on Oxide, as discussed here:
+<https://aaronweiss.us/pubs/draft20-oxide.pdf>.
+
+### TODO
+
+-   Structs/ADTs
+-   Optional types and error-handling
+-   Dictionaries
+-   Type-classes
 
 ## Survey of Languages
 
