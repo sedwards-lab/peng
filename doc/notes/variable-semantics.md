@@ -44,6 +44,9 @@ to `x`:
 
     let x = r
 
+UPDATE:
+The rule is that all reference types are automatically dereferenced one-layer deep.
+
 References are themselves values; to *alias* the reference `r` to `x`, we use
 the `&` operator to take the reference value of `r` and bind it to `x`:
 
@@ -51,11 +54,29 @@ the `&` operator to take the reference value of `r` and bind it to `x`:
 
 References cannot be taken of let-bound variables.
 
-Reference types are also designated by the `&` type constructor. There are
-details omitted here for now, but as an example, a reference to an integer is
-written (whitespace optional):
+Reference types are also designated by the `&` type constructor.
 
-    & Int
+    var x = 0
+    -- Type of x: &Int
+
+When declaring a `var` with an explicit type annotation, the `&` is automatically
+added to the bound variable, so no need to include it:
+
+    var x: Int = 0
+    -- Type of x: &Int
+
+Under the hood, there will be a `__ref__: a -> &a` function that takes a value
+of type `a`, allocates space for it, stores the value in that space, and returns
+the reference to that allocated space. Var-declarations will desugar roughly
+as follows:
+
+    var x: T = v
+    let x: &T = __ref__(v)
+
+
+(Note: the more I look at this, the more I don't like the lack of `&` in the
+type annotation of our var-declaration syntax. It may be superfluous, but not
+having it looks confusing, and it is only one character.)
 
 ### Routine parameters and delayed assignment
 
@@ -71,6 +92,86 @@ by assigning to it (with the `<-` operator):
 
     isEven (n: Int, r: &Bool) =
       r <- n % 2 == 0
+
+Since reference values are automatically dereferenced, the following will also
+typecheck, though the semantics are different---`n` is automatically dereferenced
+to obtain the value, which is used for the parity check:
+
+    isEven (n: &Int, r: &Bool) =
+      r <- n % 2 == 0
+
+However, since the reference coercion rule only goes one level deep, we need to
+explicitly dereference any references stacked further:
+
+    isEven (n: &&Int, r: &Bool) =
+      -- r <- n % 2 == 0 -- Typecheck fails
+      r <- *n % 2 == 0
+
+The `(<-): &a -> a` operator expects a reference type as its left operand, and
+expects a value of that type as its right operand. The level of references must
+match up:
+
+    isEven (n: Int, r: &&Bool) =
+      -- r <- n % 2 == 0 -- Typecheck fails
+      *r <- n % 2 == 0
+
+### Routine return values
+
+(WORK IN PROGRESS)
+
+We want to support syntactic sugar for return values to routines. That is, rather
+than explicitly providing the return site, we would like to write the following:
+
+    isEven (n: Int): Bool =
+      -- other stuff
+      n % 2 == 0
+
+When the last statement is a plain expression, it will be used as a return value.
+(TODO: We may also provide a separate `return` keyword to allow control flow to
+be terminated earlier.)
+
+The caller should be able to invoke this function as in any other programming
+language:
+
+    let r1 = isEven(2)
+    -- r1: Bool == 2
+
+    var r2 = isEven(2)
+    -- r2: &Bool |-> 2
+
+    var r3 = False
+    r3 <- isEven(2)
+
+These should desugar to:
+
+    var _r1 = __POISON__
+    fork isEven(2, &_r1)
+    let r1 = _r1
+
+    var r2 = __POISON__
+    fork isEven(2, &r2)
+
+    var r3 = False -- same as before
+    var _t1 = __POISON__
+    fork isEven(2, &_t1)
+    r3 <- _t1
+
+TODO: The semantics of multiple function calls per-expression are still yet to be
+decided on. The most intuitive interpretation would be that all routine calls in
+an expression will be forked and called at once.
+
+    -- call site
+    let x = isEven(0) && isOdd(0)
+
+    -- Should && be short circuit or not? If not, the following desugaring works:
+    var r1, r2 = False, False
+    fork isEven(0, &r1), isOdd(0, &r2)
+    let x = r1 && r2
+
+However questions remain: what should the fork call order be? This is important
+because if they share references and race on them within the same instant, we
+need a well-defined call-order to determine priority. Also, how do we handle
+short-circuiting?
 
 Variables introduced by let-bindings nor parameters cannot be assigned to using
 the `<-` operator.
@@ -89,19 +190,29 @@ Regular assignments are simply a special case of delayed assignments with delay
 time 0. So the following two statements are semantically equivalent:
 
     r <- v
-    0s later r <- v
+    in 0s, r <- v
 
-(Aesthetic note: `later` as a keyword seems a bit cumbersome. Perhaps use an
-operator like `..`?)
+    in 10s, led <- 1 -- this one
 
 ### Arrays and slices
 
+> FIXME_
+
 For any type `T` and positive (non-zero) integer `n`, we have *constant-size
-arrays*, denoted as `[n of T]`. We can construct constant-size array values
+arrays*, denoted as `[n]T`. We can construct constant-size array values
 using array notation, using either let-bindings or var-declarations:
 
-    let a: [3 of Int] = [1, 2, 3]
-    var b: &[3 of Int] = a
+    let a: [3]Int = [1, 2, 3]
+
+    var b: [3]Int = a
+    -- b: &[3]Int
+
+Note that a reference to an array is different from a array of references:
+
+    var i = 3
+    let x: [3]&Int = [&i, &i, &i]
+    x[0] <- 1
+    -- i |-> 1
 
 We can retrieve the value stored at some index using array access notation.
 For some array `a: [n of T]` and integer `i`, the return type of `a[i]` is `?T`,
@@ -113,13 +224,33 @@ whose size is known only at runtime. A slice of type `T` is denoted by `[T]`.
 Slices can be taken from references of array values using the prefix `[]` operator.
 Continuing from the example from before:
 
-    let c: [Int] = []b
+    -- b: &[3]Int
+    let c: []Int = []b
+    c[1] <- 3
 
 Note that, strictly speaking, we must first var-declare an array before we can
 obtain a slice to it from its reference. We use the following syntax sugar to do
 both (with the optional type annotation):
 
-    var []c: [Int] = a
+    let a: [3]Int = [1, 2, 3]
+
+    var c = a
+    let c: &[3]Int = ref a
+
+    c[1] <- 2
+
+    var[] c = a
+    let c: []Int = ref[] a
+
+    c[2] <- 1
+
+    let c: []Int = ref a
+
+    -- Which one?
+    var c = [1, 2, 3]
+    -- &[3]Int
+    var d = [1, 2, 3]
+    -- []Int
 
 Note that in this case, `a` must be an expression whose type is an `Int` array.
 
