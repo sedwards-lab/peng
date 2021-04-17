@@ -9,122 +9,265 @@ used for computation, such as the integers, booleans, etc.
 
 ### Bindings
 
-*Let-bindings*, or just "bindings", bind an identifier to a value, and are not
-guaranteed to be allocated storage in the running activation record. The syntax
-to bind the value of expression `expr` to `x` is written as follows:
+*Let-bindings*, or just "bindings", bind an identifier to a pure value.
+The syntax to bind the value of expression `expr` to `x` is written as follows:
 
-    let x = expr
+```
+let x = expr
+```
 
 `x` may be used in subsequent expressions, and its value will be that of `expr`.
 A let-binding may be optionally annotated with the type `T` of `expr`:
 
-    let x: T = expr
+```
+let x: T = expr
+```
 
-Note that references may not be taken to of let-bound variables. Let-bound
-variables may be shadowed.
+Note that references may not be taken to of let-bound variables, since these are
+not guaranteed to be allocated storage in the running activation record.
+Let-bound variables may be shadowed.
 
 (Aesthetic note: I don't really like `=` as the token separating the identifier
 and the expression. I think `:=` is a nice alternative, or `<-`.)
 
-### Declarations and references
+#### Declarations and references
 
-Bindings contrast *var-declarations*, or just "declarations", which allocate
-storage for values in the current activation record. A declaration of variable
-`r`, initialized to the value of expression `expr` is written:
+Let-bindings contrast *var-declarations*, or just "declarations", which allocate
+storage for values in the current activation record (though a smart optimizer
+may eliminate these allocations). A declaration of variable `r`, initialized to
+the value of expression `expr` is written:
 
-    var r = expr
+```
+var x = expr
+```
 
-(We defer introducing type annotations declarations until we explain the syntax
-for reference types.)
+The variable `r` is bound to a *stored* value. Stored values are values for which
+references may be taken, though they differ from references because they do
+not need to be explicitly dereferenced to access the underlying value.
+For instance, the following binds the _value_ of `r` to `x`:
 
-Declarations bind identifiers to references which may be used to access or
-modify the underlying value. References need not be explicitly dereferenced to
-obtain their value. This means that the following will bind the _value_ of `r`
-to `x`:
+```
+var x = 3
+let y = x
+-- y: Int == 3
+```
 
-    let x = r
+Explicit *references* may be taken of stored values using the `&` operator:
 
-UPDATE:
-The rule is that all reference types are automatically dereferenced one-layer deep.
+```
+var x = 3
+let r = &x
+-- r: &Int ==> 3
+```
 
-References are themselves values; to *alias* the reference `r` to `x`, we use
-the `&` operator to take the reference value of `r` and bind it to `x`:
+The resulting reference type is designated by the `&` type constructor (distinct
+from the `&` operator). References cannot be taken of let-bound variables.
+The `r: T ==> v` in the comment is our meta-notation to say that the reference
+`r` of type `T` points to storage containing the value `v`.
 
-    let x = &r
+(In our language, references just pointers, so maybe we should just call them pointers?
+There is a bit of a confusing analogy to be made with C++; SSM references are
+C++ pointers, which SSM stored values are C++ references.)
 
-References cannot be taken of let-bound variables.
+Reference types are a first-class member in the type system, and are denoted by
+the type constructor `&`. (This contrasts stored values, which are not type
+constructors but modifiers.) To obtain the value underlying a reference, the
+programmer must explicitly dereference a reference value using the prefix
+`(*): &a -> a` operator:
 
-Reference types are also designated by the `&` type constructor.
+```
+var x = 3
+let r = &x
+let y = *r
+-- y: Int ==> 3
+```
 
-    var x = 0
-    -- Type of x: &Int
+It may be simpler to think of var-declarations in terms of syntactic desugaring,
+where they are just used as "dereferenced references". The desugaring rule is,
+when a variable `x` is var-declared, we are given an invisible reference `__x` to
+its underlying storage. All occurrences of `x` are replaced with `*__x`,
+unless prefixed by a `&`, in which case they are just replaced by `__x`:
 
-When declaring a `var` with an explicit type annotation, the `&` is automatically
-added to the bound variable, so no need to include it:
+```
+var x = 3
+let y = x
+let r = &x
+-- desugars to
+let __x: &Int = __alloca__<Int>(1)
+let y = *__x
+let r = __x
+```
 
-    var x: Int = 0
-    -- Type of x: &Int
+The internal `__alloca__<T>(v)` function allocates storage for type `T` on
+the activation record, initialized to value `v` passed as a parameter.
 
-Under the hood, there will be a `__ref__: a -> &a` function that takes a value
-of type `a`, allocates space for it, stores the value in that space, and returns
-the reference to that allocated space. Var-declarations will desugar roughly
-as follows:
+#### Assignment
 
-    var x: T = v
-    let x: &T = __ref__(v)
+The advantage of var-declaration is that they support mutation. Given a reference
+as the left operand, the `<-` statement updates the underlying storage with the
+value given in the right operand:
 
+```
+var x = 3
+let r = &r
+r <- 1
+-- r: &Int ==> 1
+```
 
-(Note: the more I look at this, the more I don't like the lack of `&` in the
-type annotation of our var-declaration syntax. It may be superfluous, but not
-having it looks confusing, and it is only one character.)
+The left operand of `<-` must either be a reference (as shown above) or
+a var-declared stored value. That is, the following assignment is also valid:
 
-### Routine parameters and delayed assignment
+```
+var x = 3
+x <- 1
+-- &x: &Int ==> 1
+```
+
+*Delayed assignments* may also be made to references. These assignments are
+prefixed with a *time qualifier* beginning with the `in` keyword and ending
+with a `,`:
+
+```
+var x = 3
+in 10s, x <- 1
+-- x keeps its value in the current instant,
+-- but takes the value 1 in the instant 10s later
+```
+
+Note that while the assignment takes place 10s later, the destination and source
+value are taken from the current instant. For instance:
+
+```
+var x = 1
+var y = &x
+var z = 2
+in 10s, *y <- z
+-- x (current value of y) is still assigned the value 2 (current value of z)
+-- in 10s, even if y and z are modified later on in the same instant:
+z <- 3
+y <- &z
+```
+
+Note that regular assignments are simply a special case of delayed assignments
+with delay time 0. So the following two statements are semantically equivalent:
+
+```
+r <- v
+in 0s, r <- v
+```
+
+#### Routine parameters
 
 Routine parameters are *immutable*, and should be treated like local
-let-bindings. This eliminates the distinction behind pass-by-value vs
--by-reference semantics, and allows language implementations to choose whichever
-is most appropriate.
+let-bindings. Note that this language design choice eliminates the distinction
+behind pass-by-value vs -by-reference semantics, and allows language
+implementations to choose whichever is most appropriate.
 
 References may also be passed in by value, and can be used to mutate non-local
 variables. For example, the following routine `isEven` receives parameters `n`,
 an integer value, and `r`, a boolean reference. It "returns" its result to `r`
-by assigning to it (with the `<-` operator):
+by (instantly) assigning to it (with the `<-` operator):
 
-    isEven (n: Int, r: &Bool) =
-      r <- n % 2 == 0
+```
+isEven (n: Int, r: &Bool) =
+  r <- n % 2 == 0
+```
 
-Since reference values are automatically dereferenced, the following will also
-typecheck, though the semantics are different---`n` is automatically dereferenced
-to obtain the value, which is used for the parity check:
+This routine can be invoked as follows, using the `fork` primitive:
 
-    isEven (n: &Int, r: &Bool) =
-      r <- n % 2 == 0
+```
+var b = False
+fork isEven(3, &b)
+-- &b: &Bool ==> 3
+```
 
-However, since the reference coercion rule only goes one level deep, we need to
-explicitly dereference any references stacked further:
+The caller must allocate space for the return value, and pass it by reference.
+Note, though, that reference-typed parameters must still be explicitly deferenced
+to obtain their value. Consider the following variant of `isEven`, which takes
+`n` by reference:
 
-    isEven (n: &&Int, r: &Bool) =
-      -- r <- n % 2 == 0 -- Typecheck fails
-      r <- *n % 2 == 0
+```
+isEven (n: &Int, r: &Bool) =
+  -- r <- n % 2 == 0 -- typecheck fails
+  r <- *n % 2 == 0
+```
 
-The `(<-): &a -> a` operator expects a reference type as its left operand, and
-expects a value of that type as its right operand. The level of references must
-match up:
+To avoid this and treat it like a var-declared variable, we can prefix the
+parameter declaration with `var`. In this case, the `&` type constructor should
+be dropped, and the parameter is treated as a stored value in all appearances
+(alternatively, following the same desugaring rules described earlier). For
+instance, the following function also sets its first parameter to zero after
+measuring its parity, all without explicitly dereferencing it:
 
-    isEven (n: Int, r: &&Bool) =
-      -- r <- n % 2 == 0 -- Typecheck fails
-      *r <- n % 2 == 0
+```
+isEven (var n: Int, r: &Bool) =
+  r <- n % 2 == 0
+  n <- 0
+-- desugars into
+isEven (_n: &Int, r: &Bool) =
+  r <- *_n % 2 == 0
+  _n <- 0
+```
 
-### Routine return values
+#### More about stored values
 
-(WORK IN PROGRESS)
+In which I list some examples about var-declared identifiers, and attempt to
+formalize them.
+
+We have already seen that this works, and desugars as follows:
+
+```
+var x = 3
+let y = x
+let r = &x
+-- desugars to
+let __x: &Int = __alloca__<Int>(1)
+let y = *__x
+let r = __x
+```
+
+There isn't coercion going on here so much as it is truly syntactic sugar.
+The following will _not_ work, because the stored value `x` is already
+dereferenced for us:
+
+```
+var x = 1
+x <- *x + 1 -- cannot dereference a value of type Int
+```
+
+Meanwhile, those desugaring rules do not apply to let-bindings, meaning the following
+also fails to work because `y` is not automatically dereferenced:
+
+```
+var x = 1
+let y: &Int = &x
+y <- y + 1 -- type error: in expression y, expected type: Int, got type: &Int
+```
+
+Formally, _without_ thinking about these semantics in terms of desugaring, we
+may define a type _modifier_ `!` (or as a type constructor that doesn't stack)
+that distinguishes plain values of type `a` from stored values of type `!a`.
+There is always an implicit coercion `!a >-> a` so that stored values may be
+used wherever plain values may be used. We may thus define the reference
+operator `&` as a function in terms of the `!` type modifier, such that `(&): !a
+-> &a`.
+
+Furthermore, we can think of `<-` as an _overloaded_ operator to support
+assignment to both references and stored values. That is, its type is
+`(<-): (&a|!a) -> a -> ()`, where `(&a|!a)` represents the intersection type of
+references and stored values. (Note that the unitary return type `()` here is
+a placeholder for what should be some kind of state monad.)
+
+#### Routine return values (TODO)
 
 We want to support syntactic sugar for return values to routines. That is, rather
 than explicitly providing the return site, we would like to write the following:
 
-    isEven (n: Int): Bool =
-      -- other stuff
-      n % 2 == 0
+```
+isEven (n: Int): Bool =
+  -- other stuff
+  n % 2 == 0
+```
 
 When the last statement is a plain expression, it will be used as a return value.
 (TODO: We may also provide a separate `return` keyword to allow control flow to
@@ -133,155 +276,269 @@ be terminated earlier.)
 The caller should be able to invoke this function as in any other programming
 language:
 
-    let r1 = isEven(2)
-    -- r1: Bool == 2
+```
+let r1 = isEven(2)
+-- r1: Bool == 2
 
-    var r2 = isEven(2)
-    -- r2: &Bool |-> 2
+var r2 = isEven(2)
+-- r2: &Bool |-> 2
 
-    var r3 = False
-    r3 <- isEven(2)
+var r3 = False
+r3 <- isEven(2)
+```
 
 These should desugar to:
 
-    var _r1 = __POISON__
-    fork isEven(2, &_r1)
-    let r1 = _r1
+```
+var _r1 = __POISON__
+fork isEven(2, &_r1)
+let r1 = _r1
 
-    var r2 = __POISON__
-    fork isEven(2, &r2)
+var r2 = __POISON__
+fork isEven(2, &r2)
 
-    var r3 = False -- same as before
-    var _t1 = __POISON__
-    fork isEven(2, &_t1)
-    r3 <- _t1
+var r3 = False -- same as before
+var _t1 = __POISON__
+fork isEven(2, &_t1)
+r3 <- _t1
+```
 
-TODO: The semantics of multiple function calls per-expression are still yet to be
+DODO: The semantics of multiple function calls per-expression are still yet to be
 decided on. The most intuitive interpretation would be that all routine calls in
 an expression will be forked and called at once.
 
-    -- call site
-    let x = isEven(0) && isOdd(0)
+```
+-- call site
+let x = isEven(0) && isOdd(0)
 
-    -- Should && be short circuit or not? If not, the following desugaring works:
-    var r1, r2 = False, False
-    fork isEven(0, &r1), isOdd(0, &r2)
-    let x = r1 && r2
+-- Should && be short circuit or not? If not, the following desugaring works:
+var r1, r2 = False, False
+fork isEven(0, &r1), isOdd(0, &r2)
+let x = r1 && r2
+
+-- Shortcircuiting desugar
+let x = match isEven(0):
+        case True -> isOdd(0)
+        case False -> False
+```
 
 However questions remain: what should the fork call order be? This is important
 because if they share references and race on them within the same instant, we
 need a well-defined call-order to determine priority. Also, how do we handle
 short-circuiting?
 
-Variables introduced by let-bindings nor parameters cannot be assigned to using
-the `<-` operator.
-
-*Delayed assignments* may be made to references. For instance, the following
-`blink` routine alternates between writing 1s and 0s to `led` every 50ms:
-
-    blink (led: &Int) =
-      loop
-        50ms later led <- 1
-        wait led
-        50ms later led <- 0
-        wait led
-
-Regular assignments are simply a special case of delayed assignments with delay
-time 0. So the following two statements are semantically equivalent:
-
-    r <- v
-    in 0s, r <- v
-
-    in 10s, led <- 1 -- this one
-
 ### Arrays and slices
 
-> FIXME_
-
 For any type `T` and positive (non-zero) integer `n`, we have *constant-size
-arrays*, denoted as `[n]T`. We can construct constant-size array values
+arrays*, denoted by `[n]T`. We can construct constant-size array values
 using array notation, using either let-bindings or var-declarations:
 
-    let a: [3]Int = [1, 2, 3]
+```
+let a = [1, 2, 3]
+-- a: [3]T
+```
 
-    var b: [3]Int = a
-    -- b: &[3]Int
+Array values are passed around and assigned by value:
+
+```
+-- continues from before
+let b = a
+-- b: [3]T == [1, 2, 3]
+```
+
+Just like any other value, we can pass around references to arrays:
+
+```
+-- continues from before
+var c: [3]Int = a
+-- &c: &[3]Int ==> [1, 2, 3]
+```
+
+We can access elements of an array using postfix array index notation:
+
+```
+-- continues from before
+let d = a[1]
+-- d: Int ==> 2
+```
 
 Note that a reference to an array is different from a array of references:
 
-    var i = 3
-    let x: [3]&Int = [&i, &i, &i]
-    x[0] <- 1
-    -- i |-> 1
+```
+var i = 3
+let x: [3]&Int = [&i, &i, &i]
+x[0] <- 1
+-- &i: &Int ==> 3
+```
 
-We can retrieve the value stored at some index using array access notation.
-For some array `a: [n of T]` and integer `i`, the return type of `a[i]` is `?T`,
-where `?` is the type constructor for the optional ("maybe") type. It returns
-`Some x` when `i < n` and `None` otherwise.
+#### Overloaded array index notation (TODO)
 
-*Slices* are a reference type that point to some collection of values, and
-whose size is known only at runtime. A slice of type `T` is denoted by `[T]`.
-Slices can be taken from references of array values using the prefix `[]` operator.
-Continuing from the example from before:
+We also want to support array index notation on references and slices.
+Is it ok to overload on all three? That is, we also want the following to work
+just the same:
 
-    -- b: &[3]Int
-    let c: []Int = []b
-    c[1] <- 3
+```
+-- continues from before
+let d = c[1]
+-- c: Int ==>
+```
 
-Note that, strictly speaking, we must first var-declare an array before we can
-obtain a slice to it from its reference. We use the following syntax sugar to do
-both (with the optional type annotation):
+Semantically speaking, this is no problem, because there is no ambiguity here.
+This is also the case in Go; where given `a: *[n]T`, `a[x]` is shorthand for `(*a)[T]`.
+In our case, array index notation will be overloaded on at least 4 distinct types:
+array values, stored array values, references to array values, and slices.
 
-    let a: [3]Int = [1, 2, 3]
+#### Slices
 
-    var c = a
-    let c: &[3]Int = ref a
+The size of array types must be known at compile time, which can be rather
+cumbersome for writing generic, array manipulating code. Our solution is to use
+*slices*, which are a reference type that point to some collection of values, and
+whose size is known only at runtime. A slice of type `T` is denoted by `[]T`,
+and the length of some slice `s: []T` can be obtained from the expression `s.len()`.
 
-    c[1] <- 2
+Slices can be taken from references of arrays or stored array values, using the
+overloaded prefix `[]` operator:
 
-    var[] c = a
-    let c: []Int = ref[] a
+```
+var a: [3]Int = [1, 2, 3]
+let b: &[3]Int = &a
 
-    c[2] <- 1
+let sb = []b
+-- sb: []Int ==> [1, 2, 3]
 
-    let c: []Int = ref a
+b <- [4, 5, 6]
 
-    -- Which one?
-    var c = [1, 2, 3]
-    -- &[3]Int
-    var d = [1, 2, 3]
-    -- []Int
+let sa = []a
+-- sa: []Int ==> [4, 5, 6]
+```
 
-Note that in this case, `a` must be an expression whose type is an `Int` array.
+In the case of a stored array value, the `[]` prevents desugaring from inserting
+the implicit dereference in front of the identifier. Also note that while one
+can directly assign array values to references to arrays, one cannot do the same
+for slices.
 
 Slices are implemented using "fat pointers", which store a length, a pointer to
 the underlying struct's `cv_t`, and an index to the first element of the slice.
-To check the length of an array, we use the `.len()` method, e.g., `c.len()`.
-Like arrays, slices can be indexed using array access notation, and return an
-optional type.
+Like array values, slices can be indexed using array access notation.
 
 Shorter slices may always be taken from longer slices, but once shortened,
 a slice cannot grow. To take a slice of all but the first element of `c`, we
 may write:
 
-    assert(c.len() == 3)
-    let d: [Int] = c[1:]
-    assert(d.len() == 2)
+```
+-- c.len() == 3
+let d: []Int = c[1:]
+-- d.len() == 2
+-- d ==> [c[1], c[2]]
+```
 
 Slices that are out of range yield empty slices:
 
-    let e: [Int] = c[42:]
-    assert(e.len() == 0)
+```
+let e: []Int = c[42:]
+-- e.len() == 0
+```
 
-Note that plain references may be thought of as a special case of slices of
-size 1, where the size is known at runtime. One can also retrieve an optional
-reference from some index using a reference array access:
+#### Array index return type (TODO)
 
-    let x: ?Int = c[&0]
+What should the return value of an array index be? Right now, array indexing is
+an unsafe operation. Shall we provide stronger guarantees to the user?
 
-Delayed assignments may be made to any item pointed to by a slice. Waiting on
-a slice blocks until any of the underlying items is assigned to (disjunctive
-semantics). Routines may also block on individual elements or sub-slices.
+This discussion is also dependent on what error handling and propagation features
+we expose to the programmer.
+
+Perhaps for some array `a: [n]T` and integer `i`, the return type of `a[i]` is `?T`,
+where `?` is the type constructor for the optional ("maybe") type. It returns
+`Some x` when `i < n` and `None` otherwise.
+
+Also, more critically, we need to clarify the assignability of the expression
+`a[i]`. In particular, if `a` is assignable, then so should `a[i]`. That is,
+the following should be ok:
+
+```
+var a = [1, 2, 3]
+let b = &a
+a[0] <- 4 -- OK
+-- &a: &[3]Int ==> [4, 2, 3]
+b[1] <- 5 -- OK
+-- b: &[3]Int ==> [4, 5, 3]
+```
+
+But the following should be illegal:
+```
+-- continued from before
+let c = [1, 2, 3]
+-- c[2] <- 6 -- Fails; no underlying storage for array value a[2]
+```
+
+Array-valued assignments may also be made to references to arrays and stored array
+values, but not to slices or let-bound array values:
+
+```
+-- continued from before
+a <- [1, 1, 1] -- OK
+-- &a: &[3]Int ==> [1, 1, 1]
+b <- [9, 9, 9] -- OK
+-- b: &[3]Int ==> [9, 9, 9]
+
+-- c <- [4, 4, 4] -- Fails; cannot assign to let-bound value
+let d = []a
+-- d <- [4, 4, 4] -- Fails; cannot assign directly to a slice
+```
+
+A solution, in terms of the `!` stored value type modifier, is to say that:
+
+```
+when a: [n]T,   a[x]: T
+     a: ![n]T,  a[x]: !T
+     a: &[n]T,  a[x]: !T
+     a: []T,    a[x]: !T
+```
+
+Note that delayed assignments may be made to any item in a slice, stored array
+value, or reference to an array:
+
+```
+in 2s, a[0] <- 3
+```
+
+Statements can wait/await on individual elements of an array, so long as those
+elements are assignable. Furthermore, statements can wait on slices or sub-slices
+(slices taken from slices), and will block until any of the underlying items is
+assigned to (with disjunctive semantics). If a slice is empty, the statement
+should not block.
+
+Blocking on an incomplete array value, whether a sub-slice or a single element,
+can be implemented in one of several ways:
+
+-   The blocking process can add itself to underlying array's list of triggers,
+    and declares which elements it is blocking on. When an assignment is made to
+    that array, the runtime only wakes the blocking process if the assignment is
+    made to an element that is blocked on; otherwise, it leaves that process
+    blocked. This adds overhead if there are a lot of processes blocked on
+    different parts of an array.
+-   Each array element maintains its own list of triggers. A blocking process
+    adds itself to the trigger list of each element it is waiting on. This
+    alternative is less efficient, because this does not scale well for large
+    arrays (whereas the aforementioned implementation scales alongside the number
+    of blocking processes).
+
+#### Slice declaration (TODO)
+
+Do we need shorthand for declaring array storage and taking a slice for it?
+That is:
+
+```
+var[] s = [1, 2, 3]
+-- desugars to
+var _s: [3]Int = [1, 2, 3]
+let s = []*_s
+```
+
+Then again, it's not that cumbersome to put a `[]` everywhere we need to use slice
+to a stored array value, i.e., when passing by reference to functions and when
+assigning to a reference to a slice. In both cases, it seems worth explicitly
+noting that we are taking the slice of a stored array value.
 
 ### Lifetimes
 
