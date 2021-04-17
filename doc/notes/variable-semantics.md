@@ -303,7 +303,7 @@ fork isEven(2, &_t1)
 r3 <- _t1
 ```
 
-DODO: The semantics of multiple function calls per-expression are still yet to be
+TODO: The semantics of multiple function calls per-expression are still yet to be
 decided on. The most intuitive interpretation would be that all routine calls in
 an expression will be forked and called at once.
 
