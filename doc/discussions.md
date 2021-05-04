@@ -11,6 +11,12 @@ I separated them out here.
 -   Type-classes
 -   Motivating example: Conway's Game of Life
 
+## Implementation
+
+Why do we need the `prev_ptr`?
+
+Can the runtime do the `desensitize` call on behalf of the program?
+
 ## Bindings
 
 ### More about stored values
@@ -458,6 +464,77 @@ demux(var s: Int, var i: Int, os: []&Int) =
         o <- i
         wait [&s, &i]
 ```
+
+## Composite Types
+
+This section is for discussing composite types in general. For discussion about
+arrays and structs in particular, see the corresponding sections.
+
+### Trigger by Address Region
+
+This might be how we implement slices to support delayed assignment:
+
+```
+struct int_slice_t {
+    cv_int_array_t *p;  // trigger is here
+                        // p->value[start + ..]
+    size_t start, len;
+}
+
+struct int_slice_t' {   // alternate implementation, explicitly tracking pointer
+    cv_int_array_t *p;  // trigger is here
+    int *start;         // we don't have to explicitly compute p->value[start + i]
+                        // each time
+    size_t len;
+}
+```
+
+What if we just change the `wait` primitive to specify a set of contiguous
+address ranges, on which a process can block? (1) Can we efficiently determine,
+at run-time, which processes should be triggered by a (immediate or delayed)
+write? (2) And can we, at compile-time, know whether particular writes will
+never trigger anything?
+
+We can definitely do (1), and efficiency will in part depend on what we can do
+at compile time. We can do better than simply maintaining a trigger list, using
+some kind of a trigger tree? Maybe look into how routers do this, though the
+problem they solve is quite different. Also look into how line-clipping works
+from graphics, or "range queries". This _may_ be worth it, but might add an
+unacceptable amount of maintenance overhead.
+
+Follow-up: range queries aren't quite what we're looking for; this subject is
+more about optimizing collections of data into ranges that can be efficiently
+queries efficiently, but often the preprocessing time is going to be at least
+linear (since these all take linear space). Line-clipping algorithms are
+seemingly optimized for 2-dimensional problems. Routers rely on data structures
+that exploit the maximum size of an IP address.
+
+### Semantics for partial updates of composite types
+
+What is a sane and efficient semantics for partial updates of composite types?
+For instance, given an array `var a: [3]Int`, we have three processes assigning
+to it:
+
+-   Process A assigns `[1, 1, 1]` to `a`
+-   Process B assigns `2` to `a[1]`
+-   Process C assigns `3` to `a[2]`
+
+We also have some processes blocking on it:
+
+-   Process P blocks on `a`, i.e. `await a`
+-   Process Q blocks on a slice of `a`, i.e. `await []a`
+-   Process R blocks on `a[0]`, i.e., `await &a[0]`
+
+There are several variations to this problem, which can be adjusted by
+converting the assignments to delayed assignments of various times, and
+adjusting the times at which processes A, B, and C actually issue the
+assignment. The solution should also be semantically consistent with what could
+work for composite types.
+
+A possible semantics could be that there are full updates, and there are partial
+updates. At most one can be scheduled at a time. So, for instance, if there is
+a full update scheduled, and there is a partial update made to one of the parts,
+the full update should be canceled.
 
 ## Slices
 
